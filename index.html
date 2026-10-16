@@ -234,6 +234,7 @@
           <input type="file" id="fAud" accept="audio/*,.mp3,.wav,.m4a,.ogg"></label>
         <label class="drop" id="dTxt"><b>3. Текст по строкам</b><span id="sTxt"></span>
           <input type="file" id="fTxt" accept=".txt,text/plain"></label>
+        <button class="btn" id="genOpen" style="display:none;width:100%" title="Программа сама сгенерирует картинки в Gemini по вашим промтам">Сгенерировать картинки (Gemini)</button>
       </div>
     </div>
 
@@ -399,6 +400,31 @@
 
 <div class="dropall" id="dropall">Отпустите файлы: картинки, озвучку или текст</div>
 
+<div class="modal" id="genModal">
+  <div class="card" style="width:min(720px,94vw)">
+    <h2>Генерация картинок в Gemini</h2>
+    <div class="hint" style="margin:0 0 8px">Вставьте промты: каждая сцена отделяется пустой строкой. Сначала нажмите «Открыть Gemini» и один раз войдите в аккаунт Google в открывшемся окне Chrome.</div>
+    <textarea id="gPrompts" style="width:100%;height:180px;resize:vertical;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px;font:13px/1.4 inherit" placeholder="Промт сцены 1&#10;&#10;Промт сцены 2&#10;&#10;..."></textarea>
+    <div class="row" style="margin:8px 0;flex-wrap:wrap">
+      <label class="btn" style="width:auto;margin:0;cursor:pointer;display:inline-block">Загрузить prompts.txt<input type="file" id="gFile" accept=".txt,text/plain" style="display:none"></label>
+      <span class="hint" id="gCount" style="margin:0;flex:1">Сцен: 0</span>
+      <span style="color:var(--dim);font-size:13px">Пауза между сценами</span>
+      <select id="gDelay" style="width:auto"><option value="2">Короткая</option><option value="5" selected>Обычная</option><option value="12">Долгая</option></select>
+    </div>
+    <div class="row" style="gap:8px;margin-bottom:8px">
+      <button class="btn" id="gLaunch" style="margin:0">Открыть Gemini</button>
+      <button class="btn primary" id="gStart" style="margin:0">Старт</button>
+      <button class="btn" id="gStop" style="margin:0;display:none">Стоп</button>
+      <button class="btn" id="gUse" style="margin:0" title="Поставить готовые картинки в проект по порядку">Добавить в проект</button>
+    </div>
+    <div class="prog"><div id="gBar"></div></div>
+    <div class="hint" id="gStat" style="margin:6px 0">Готово: 0</div>
+    <div id="gLog" style="height:120px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;font:12px/1.5 monospace;color:var(--dim);background:var(--panel2)"></div>
+    <div class="hint" id="gDir" style="margin:6px 0 8px"></div>
+    <button class="btn" id="gClose">Закрыть</button>
+  </div>
+</div>
+
 <div class="modal" id="modal">
   <div class="card">
     <h2>Запись завершена</h2>
@@ -423,7 +449,8 @@
   const TRD = () => ({on:false, every:'1', dur:'0.4', fin:false, fout:false});
   const SBD = () => ({burn:false, srt:false, hl:true, size:'56'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
-  const newState = () => ({fx:FXD(), tr:TRD(), sb:SBD(), mu:MUD(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const GND = () => ({text:'', dir:'', key:''});
+  const newState = () => ({fx:FXD(), tr:TRD(), sb:SBD(), mu:MUD(), gen:GND(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -570,6 +597,138 @@
     return frames;
   }
 
+  /* ---------- image generation through Gemini (Chrome over the debugging port) ---------- */
+  // Everything Gemini-specific is kept here so it can be repaired with an ordinary update.
+  const GEN = {
+    port: 9222, url: (() => { try{ return localStorage.getItem('autocut.genurl') || 'https://gemini.google.com/app'; }catch(e){ return 'https://gemini.google.com/app'; } })(),
+    input: ["rich-textarea div[role='textbox']", "div[contenteditable='true'][role='textbox']", "div.ql-editor"],
+    dlRe: /download|скачать|завантажити/i,
+    waitImage: 240000, waitDownload: 60000, tries: 2
+  };
+  const gsleep = ms => new Promise(r => setTimeout(r, ms));
+  class Cdp {
+    constructor(ws){ this.ws = ws; this.id = 0; this.cb = {}; this.ev = []; ws.onmessage = m => { const d = JSON.parse(m.data);
+      if(d.id && this.cb[d.id]){ const c = this.cb[d.id]; delete this.cb[d.id]; d.error ? c[1](new Error(d.error.message)) : c[0](d.result); } else if(d.method) this.ev.forEach(f => f(d)); }; }
+    send(method, params, sessionId){ return new Promise((ok, no) => { const id = ++this.id; this.cb[id] = [ok, no];
+      this.ws.send(JSON.stringify(Object.assign({id, method, params: params||{}}, sessionId ? {sessionId} : {}))); setTimeout(() => { if(this.cb[id]){ delete this.cb[id]; no(new Error('Нет ответа от Chrome: '+method)); } }, 60000); }); }
+  }
+  const G = {run:false, stop:false, cdp:null, sid:null, dir:'', sep:'/', log:[]};
+  const glog = t => { const el = $('gLog'); const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString('ru-RU')+'  '+t; el.appendChild(d); el.scrollTop = el.scrollHeight; };
+  function parsePrompts(txt){
+    return String(txt||'').replace(/\r/g,'').split(/\n\s*\n/).map(p => p.split('\n').map(l => l.trim()).filter(Boolean).join(' ')).filter(Boolean);
+  }
+  const imgName = n => 'image_'+n+'.png';
+  async function genDirFor(){
+    if(!S.gen.key){ const f = findTab(activeId); S.gen.key = ((f&&f.t.name)||'Видео')+'_'+String(activeId).slice(-4); }
+    S.gen.dir = await NATIVE.gen.dir(S.gen.key);
+    G.dir = S.gen.dir; G.sep = /\\/.test(G.dir) ? '\\' : '/'; $('gDir').textContent = 'Картинки сохраняются в папку: '+G.dir; return G.dir;
+  }
+  async function doneSet(){
+    const names = await NATIVE.gen.ls(G.dir || await genDirFor()), set = new Set();
+    names.forEach(n => { const m = n.match(/^image_(\d+)\.png$/); if(m) set.add(+m[1]); }); return set;
+  }
+  async function genStat(){
+    const total = parsePrompts($('gPrompts').value).length, ok = (await doneSet()).size;
+    $('gCount').textContent = 'Сцен: '+total; $('gStat').textContent = 'Готово: '+ok+(total ? ' из '+total : '');
+    $('gBar').style.width = (total ? Math.min(100, ok/total*100) : 0)+'%'; return {total, ok};
+  }
+  async function genConnect(){
+    if(G.cdp && G.cdp.ws.readyState === 1) return;
+    const v = await NATIVE.gen.version(GEN.port);
+    if(!v || !v.webSocketDebuggerUrl) throw new Error('Chrome не отвечает. Нажмите «Открыть Gemini» и дождитесь окна. Если оно уже было открыто, закройте все окна этого Chrome и откройте заново кнопкой.');
+    const ws = new WebSocket(v.webSocketDebuggerUrl);
+    await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = () => no(new Error('Не удалось подключиться к Chrome')); });
+    G.cdp = new Cdp(ws);
+    const t = await G.cdp.send('Target.getTargets'); let pg = (t.targetInfos||[]).filter(x => x.type==='page');
+    pg = pg.find(x => /gemini\.google\.com/.test(x.url)) || pg[0];
+    if(!pg){ const c = await G.cdp.send('Target.createTarget', {url: GEN.url}); pg = {targetId: c.targetId}; }
+    const a = await G.cdp.send('Target.attachToTarget', {targetId: pg.targetId, flatten: true}); G.sid = a.sessionId;
+    await G.cdp.send('Page.enable', {}, G.sid); await G.cdp.send('Runtime.enable', {}, G.sid);
+  }
+  const gEval = async expr => { const r = await G.cdp.send('Runtime.evaluate', {expression: expr, returnByValue: true, awaitPromise: true}, G.sid); return r.result ? r.result.value : undefined; };
+  async function genScene(n, prompt){
+    const cdp = G.cdp, sid = G.sid;
+    await cdp.send('Page.navigate', {url: GEN.url}, sid);
+    // page and input box
+    let ok = false, t0 = Date.now();
+    const selJs = JSON.stringify(GEN.input);
+    while(Date.now()-t0 < 40000 && !G.stop){
+      ok = await gEval('(()=>{for(const s of '+selJs+'){const e=document.querySelector(s); if(e&&e.offsetParent!==null){e.focus(); return true;}} return false;})()').catch(() => false);
+      if(ok) break; await gsleep(800);
+    }
+    if(!ok) throw new Error('Не найдено поле ввода. Войдите в аккаунт Google в окне Chrome.');
+    await gsleep(1200);
+    await cdp.send('Input.insertText', {text: prompt}, sid); await gsleep(900);
+    for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid);
+    // wait for the download button of the finished picture
+    const re = GEN.dlRe.source; let rect = null; t0 = Date.now();
+    while(Date.now()-t0 < GEN.waitImage && !G.stop){
+      rect = await gEval('(()=>{const re=new RegExp('+JSON.stringify(re)+',"i"); for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||""); if(re.test(l)){b.scrollIntoView({block:"center"}); const r=b.getBoundingClientRect(); if(r.width>0&&r.height>0) return {x:r.left+r.width/2,y:r.top+r.height/2};}} return null;})()').catch(() => null);
+      if(rect) break; await gsleep(2000);
+    }
+    if(G.stop) throw new Error('stopped');
+    if(!rect) throw new Error('Картинка не появилась за '+Math.round(GEN.waitImage/1000)+' с (возможно, лимит Gemini)');
+    await gsleep(1500);
+    rect = await gEval('(()=>{const re=new RegExp('+JSON.stringify(re)+',"i"); for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||""); if(re.test(l)){const r=b.getBoundingClientRect(); if(r.width>0) return {x:r.left+r.width/2,y:r.top+r.height/2};}} return null;})()') || rect;
+    const got = new Promise((ok, no) => { const to = setTimeout(() => { cdp.ev = cdp.ev.filter(f => f!==h); no(new Error('Скачивание не началось')); }, GEN.waitDownload);
+      const h = d => { if(if(d.method==='Browser.downloadProgress' && d.params.state==='completed'){ clearTimeout(to); cdp.ev = cdp.ev.filter(f => f!==h); ok(d.params.guid); }
+                        else if(d.method==='Browser.downloadProgress' && d.params.state==='canceled'){ clearTimeout(to); cdp.ev = cdp.ev.filter(f => f!==h); no(new Error('Скачивание отменено')); } };
+      cdp.ev.push(h); });
+    await cdp.send('Input.dispatchMouseEvent', {type:'mouseMoved', x:rect.x, y:rect.y}, sid);
+    await cdp.send('Input.dispatchMouseEvent', {type:'mousePressed', x:rect.x, y:rect.y, button:'left', clickCount:1}, sid);
+    await cdp.send('Input.dispatchMouseEvent', {type:'mouseReleased', x:rect.x, y:rect.y, button:'left', clickCount:1}, sid);
+    const guid = await got;
+    await gsleep(400);
+    const src = G.tmp + (/\\/.test(G.tmp) ? '\\' : '/') + guid, dst = G.dir + G.sep + imgName(n);
+    if(await NATIVE.gen.size(src) <= 0) throw new Error('Файл не найден после скачивания');
+    const r = await NATIVE.gen.rename(src, dst); if(!r.ok) throw new Error(r.error);
+  }
+  async function genStart(){
+    if(G.run) return;
+    const prompts = parsePrompts($('gPrompts').value); if(!prompts.length){ toast('Вставьте промты'); return; }
+    S.gen.text = $('gPrompts').value; touch();
+    G.run = true; G.stop = false; $('gStart').style.display = 'none'; $('gStop').style.display = '';
+    try{
+      await genDirFor(); G.tmp = await NATIVE.gen.tmp(); await genConnect();
+      await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath: G.tmp, eventsEnabled:true});
+      const delay = parseInt($('gDelay').value,10) || 5; let fails = 0;
+      for(let n = 1; n <= prompts.length && !G.stop; n++){
+        if((await doneSet()).has(n)) continue;
+        glog('Сцена '+n+' из '+prompts.length+': '+prompts[n-1].slice(0,50)+'…');
+        let okk = false, lastErr = '';
+        for(let k = 1; k <= GEN.tries && !okk && !G.stop; k++){
+          try{ await genScene(n, prompts[n-1]); okk = true; glog('  сохранено '+imgName(n)); }
+          catch(e){ lastErr = e.message; if(G.stop) break; glog('  ошибка: '+e.message+(k<GEN.tries ? ' — пробую ещё раз' : '')); await gsleep(3000); }
+        }
+        if(!okk && !G.stop){ fails++; glog('  сцена '+n+' пропущена'); if(fails >= 5 && /лимит|не найдено поле|Chrome/.test(lastErr)){ glog('Слишком много ошибок подряд, останавливаюсь.'); break; } } else fails = 0;
+        await genStat();
+        if(!G.stop) await gsleep((delay + Math.random()*delay)*1000);
+      }
+      const st = await genStat();
+      glog(G.stop ? 'Остановлено.' : (st.ok >= st.total ? 'Готово! Нажмите «Добавить в проект».' : 'Завершено, но не все сцены готовы. Нажмите «Старт» ещё раз: сделанные пропустятся.'));
+    }catch(e){ glog('Ошибка: '+e.message); }
+    G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none';
+  }
+  async function genUse(){
+    const dir = await genDirFor(), names = (await NATIVE.gen.ls(dir)).map(n => n.match(/^image_(\d+)\.png$/)).filter(Boolean).sort((a,b) => a[1]-b[1]);
+    if(!names.length){ toast('Пока нет готовых картинок'); return; }
+    S.imgs.forEach(i => { if(i.url && i.url.startsWith('blob:')) URL.revokeObjectURL(i.url); });
+    S.imgs = names.map(m => ({name:m[0], path:dir+G.sep+m[0], url:fileUrl(dir+G.sep+m[0])}));
+    renderFiles(); refresh(); touch(); $('genModal').classList.remove('on'); toast('Картинок добавлено в проект: '+S.imgs.length);
+  }
+  if(NATIVE){
+    $('genOpen').style.display = '';
+    $('genOpen').onclick = async () => {
+      if(!NATIVE.gen){ toast('Для этой функции нужно один раз установить новую версию AutoCut (установщик скачайте заново).'); return; }
+      $('gPrompts').value = S.gen.text || ''; $('gLog').innerHTML = ''; $('genModal').classList.add('on'); await genDirFor(); genStat();
+    };
+    $('gPrompts').oninput = () => { S.gen.text = $('gPrompts').value; touch(); genStat(); };
+    $('gFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; $('gPrompts').value = await f.text(); S.gen.text = $('gPrompts').value; touch(); genStat(); };
+    $('gLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:GEN.url}); glog(r.ok ? 'Chrome запущен. Войдите в Google, если нужно, и нажмите «Старт».' : 'Ошибка: '+r.error); };
+    $('gStart').onclick = genStart; $('gStop').onclick = () => { G.stop = true; glog('Останавливаю после текущей операции…'); };
+    $('gUse').onclick = genUse; $('gClose').onclick = () => $('genModal').classList.remove('on');
+  }
+
   /* ---------- channels, projects (tabs) and autosave ---------- */
   let DB = null, VIEW = 'work', activeId = null;
   function load(){
@@ -601,7 +760,7 @@
   function serialize(st){
     return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, sb:st.sb, mu:st.mu};
+            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, sb:st.sb, mu:st.mu, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key}};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -623,7 +782,7 @@
     const st = newState(); states[id] = st;
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d) return st;
-    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {});
+    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.gen = Object.assign(GND(), d.gen || {});
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }

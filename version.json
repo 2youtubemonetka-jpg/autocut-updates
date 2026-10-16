@@ -1,7 +1,7 @@
 {
- "version": "1.9.0",
+ "version": "2.0.0",
  "files": {
-  "index.html": "78614aada7c591e988b961e7c02c39ebe0d3d7009dc1a4a7e967543a862b8ba9",
+  "index.html": "35441abb5423b6898106d0e62731d4db2bc2fa4e434f38e7cd8f095878e50213",
   "render.js": "92a2b9de82b96fe368acaf6a5d250d98e9bd6e830b4ef06d25553609c784d4f0"
  }
 }
