@@ -130,6 +130,12 @@
   .fxk i:hover{border-color:var(--accent2);color:var(--text)}
   .iw{position:relative;overflow:hidden;background:#000;flex:none}
   .iw img{width:100%;height:100%;object-fit:contain;display:block;max-width:none;max-height:none;will-change:transform}
+  .vol{display:flex;align-items:center;gap:8px;margin-left:auto;color:var(--dim);font-size:13px}
+  .vol input{width:120px;accent-color:var(--accent);cursor:pointer}
+  .vol b{min-width:38px;text-align:right;color:var(--text);font-weight:600;font-size:12.5px}
+  .vol button{background:none;border:1px solid var(--line);border-radius:8px;padding:2px 8px;font-size:12px;color:var(--dim)}
+  .vol button:hover{border-color:var(--accent2);color:var(--text)}
+  .ctrl .time{margin-left:14px}
   /* nav + toast */
   .themes{display:flex;gap:5px;margin-left:8px}
   .themes button{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);padding:0}
@@ -246,6 +252,8 @@
       <kbd>Пробел</kbd><span>следующая картинка</span>
       <kbd>←</kbd><span>назад на 1 кадр</span>
       <kbd>P</kbd><span>пауза / продолжить</span>
+      <kbd>↑ ↓</kbd><span>громче / тише</span>
+      <kbd>M</kbd><span>без звука</span>
       <kbd>F</kbd><span>на весь экран</span>
     </div>
   </aside>
@@ -271,6 +279,7 @@
       <button class="btn" id="bPause" disabled>Пауза (P)</button>
       <button class="btn" id="bReview" disabled>Просмотр результата</button>
       <button class="btn" id="bExport" disabled>Экспорт</button>
+      <span class="vol"><button id="mute" title="Выключить звук (M)">Звук</button><input type="range" id="vol" min="0" max="100" step="1" value="100" title="Громкость (стрелки вверх и вниз)"><b id="volv">100%</b></span>
       <span class="time" id="time">0:00 / 0:00</span>
     </div>
   </main>
@@ -949,6 +958,21 @@
     $('rCancel').onclick = () => NATIVE.cancel();
   }
 
+  /* ---------- volume ---------- */
+  let vol = 100, muted = false;
+  try{ const v = parseInt(localStorage.getItem('autocut.vol'),10); if(v>=0 && v<=100) vol = v; }catch(e){}
+  function applyVol(save){
+    au.volume = muted ? 0 : vol/100;
+    $('vol').value = muted ? 0 : vol; $('volv').textContent = (muted ? 0 : vol)+'%';
+    $('mute').textContent = muted || vol===0 ? 'Включить' : 'Звук';
+    if(save){ try{ localStorage.setItem('autocut.vol', String(vol)); }catch(e){} }
+  }
+  function setVol(v){ vol = Math.max(0, Math.min(100, Math.round(v))); muted = false; applyVol(true); }
+  $('vol').oninput = e => setVol(+e.target.value);
+  $('vol').onchange = () => $('vol').blur();
+  $('mute').onclick = () => { muted = !muted; if(!muted && vol===0) vol = 50; applyVol(false); $('mute').blur(); };
+  applyVol(false);
+
   /* ---------- buttons & keys ---------- */
   $('start').onclick = startRec;
   $('bNext').onclick = next;
@@ -967,6 +991,9 @@
     if(e.code==='Space'){ e.preventDefault(); if(S.mode==='rec') next(); }
     else if(e.code==='ArrowLeft' || e.code==='Backspace'){ e.preventDefault(); back(); }
     else if(e.code==='KeyP' || e.code==='KeyK'){ e.preventDefault(); togglePause(); }
+    else if(e.code==='ArrowUp'){ e.preventDefault(); setVol(vol+10); toast('Громкость '+vol+'%'); }
+    else if(e.code==='ArrowDown'){ e.preventDefault(); setVol(vol-10); toast('Громкость '+vol+'%'); }
+    else if(e.code==='KeyM'){ e.preventDefault(); muted = !muted; if(!muted && vol===0) vol = 50; applyVol(false); toast(muted ? 'Звук выключен' : 'Громкость '+vol+'%'); }
     else if(e.code==='KeyF'){ e.preventDefault(); if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
   });
   // do not let buttons keep focus, otherwise Space would "click" them
