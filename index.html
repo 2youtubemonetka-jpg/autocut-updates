@@ -66,7 +66,7 @@
   .topbar .grow{flex:1}
   .textcur{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:16px 22px;font-size:clamp(20px,2.4vw,32px);font-weight:600;line-height:1.3;min-height:84px;display:flex;align-items:center}
   .stage{flex:1;min-height:0;display:grid;place-items:center;background:var(--stage);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;position:relative}
-  .stage img{max-width:100%;max-height:100%;display:block}
+  .stage .iw img{max-width:none}
   .stage .empty{color:var(--dim);text-align:center;padding:20px}
   .stage .empty b{display:block;font-size:20px;color:var(--text);margin-bottom:6px}
   .badge{position:absolute;left:12px;top:12px;background:var(--overlay);border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-size:13px}
@@ -116,6 +116,20 @@
   .textcur.live{border-left-color:var(--now)}
 
 
+  /* effects */
+  .fxbox{border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:10px 12px;display:grid;gap:9px}
+  .fxbox .row span{flex:1;color:var(--dim);font-size:13px}
+  .fxbox select{max-width:150px}
+  #fxopts{display:grid;gap:9px}
+  #fxopts.off{opacity:.45;pointer-events:none}
+  .fxkinds{display:grid;gap:6px}
+  .fxk{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:6px 9px;font-size:13px;cursor:pointer;user-select:none}
+  .fxk.on{border-color:var(--accent);background:var(--tint)}
+  .fxk b{flex:1;font-weight:500}
+  .fxk i{font-style:normal;font-size:11px;width:24px;height:22px;border-radius:7px;border:1px solid var(--line);display:grid;place-items:center;color:var(--dim)}
+  .fxk i:hover{border-color:var(--accent2);color:var(--text)}
+  .iw{position:relative;overflow:hidden;background:#000;flex:none}
+  .iw img{width:100%;height:100%;object-fit:contain;display:block;max-width:none;max-height:none;will-change:transform}
   /* nav + toast */
   .themes{display:flex;gap:5px;margin-left:8px}
   .themes button{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);padding:0}
@@ -199,6 +213,23 @@
       <div class="stat" id="stA"><b>0:00</b><small>звук</small></div>
     </div>
     <div class="msg" id="msg"></div>
+
+    <div class="sec">
+      <h4>Эффекты</h4>
+      <div class="fxbox">
+        <label class="chk"><input type="checkbox" id="fxOn"> Движение камеры (зум и панорама)</label>
+        <div id="fxopts" class="off">
+          <div class="row"><span>К каким картинкам</span>
+            <select id="fxEvery"><option value="1">Ко всем</option><option value="2">Через одну</option><option value="3">Каждая 3-я</option><option value="5">Каждая 5-я</option><option value="10">Каждая 10-я</option></select></div>
+          <div class="fxkinds" id="fxKinds"></div>
+          <div class="row"><span>Порядок</span>
+            <select id="fxOrder"><option value="cycle">По кругу</option><option value="random">Вперемешку</option></select></div>
+          <div class="row"><span>Сила</span>
+            <select id="fxPower"><option value="light">Лёгкая</option><option value="mid">Средняя</option><option value="strong">Сильная</option></select></div>
+          <div class="hint" style="margin:0">Галочка включает эффект в списке. Кнопка ▶ показывает пример на текущей картинке. Эффекты видны в «Просмотре результата» и попадают в готовое видео.</div>
+        </div>
+      </div>
+    </div>
 
     <div class="sec">
       <h4>Настройки</h4>
@@ -290,7 +321,8 @@
 <script>
 (function(){
   const $ = id => document.getElementById(id);
-  const newState = () => ({imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const FXD = () => ({on:false, every:'1', kinds:['lr','rl','in','out'], order:'cycle', power:'mid'});
+  const newState = () => ({fx:FXD(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -308,6 +340,66 @@
   }
   document.querySelectorAll('#themes button').forEach(b => b.onclick = () => applyTheme(b.dataset.t));
   applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  /* ---------- motion effects ---------- */
+  const FXK = [['lr','Слева направо'],['rl','Справа налево'],['in','Приближение к центру'],['out','Отдаление от центра']];
+  const POWER = {light:1.1, mid:1.2, strong:1.35};
+  const fxZoom = () => POWER[S.fx.power] || 1.2;
+  function fxFor(i){
+    const f = S.fx; if(!f || !f.on || !f.kinds.length) return null;
+    const e = Math.max(1, parseInt(f.every,10) || 1); if(i % e !== 0) return null;
+    const k = Math.floor(i / e), ks = FXK.map(x => x[0]).filter(x => f.kinds.includes(x));
+    if(!ks.length) return null;
+    if(f.order==='random'){ const h = (((k+1) * 2654435761) >>> 0); return ks[h % ks.length]; }
+    return ks[k % ks.length];
+  }
+  let curAnim = null;
+  function clearFx(){ if(curAnim){ try{ curAnim.cancel(); }catch(e){} curAnim = null; } }
+  function fxTransforms(kind, z){
+    const sh = (z-1)/2*100;
+    if(kind==='in')  return ['scale(1)', 'scale('+z+')'];
+    if(kind==='out') return ['scale('+z+')', 'scale(1)'];
+    if(kind==='lr')  return ['translateX('+sh+'%) scale('+z+')', 'translateX('+(-sh)+'%) scale('+z+')'];
+    return ['translateX('+(-sh)+'%) scale('+z+')', 'translateX('+sh+'%) scale('+z+')'];
+  }
+  function playFx(kind, ms, z, offset){
+    const img = $('stage').querySelector('.iw img'); if(!img) return null;
+    clearFx();
+    const t = fxTransforms(kind, z);
+    curAnim = img.animate([{transform:t[0]},{transform:t[1]}], {duration:Math.max(150,ms), easing:'linear', fill:'forwards'});
+    if(offset) curAnim.currentTime = offset;
+    return curAnim;
+  }
+  function fitIw(){
+    const iw = document.querySelector('#stage .iw'); if(!iw) return;
+    const sw = $('stage').clientWidth - 2, sh = $('stage').clientHeight - 2;
+    const w = Math.max(50, Math.min(sw, sh*16/9)); iw.style.width = w+'px'; iw.style.height = (w*9/16)+'px';
+  }
+  new ResizeObserver(fitIw).observe($('stage'));
+  function renderFx(){
+    const f = S.fx;
+    $('fxOn').checked = !!f.on; $('fxopts').classList.toggle('off', !f.on);
+    $('fxEvery').value = f.every; $('fxOrder').value = f.order; $('fxPower').value = f.power;
+    const box = $('fxKinds'); box.innerHTML = '';
+    FXK.forEach(([k,label]) => {
+      const el = document.createElement('div'); el.className = 'fxk'+(f.kinds.includes(k)?' on':'');
+      const b = document.createElement('b'); b.textContent = label;
+      const pv = document.createElement('i'); pv.textContent = '▶'; pv.title = 'Показать пример';
+      pv.onclick = ev => {
+        ev.stopPropagation();
+        if(!S.imgs.length){ toast('Сначала добавьте картинки'); return; }
+        if(VIEW!=='work') return;
+        const a = playFx(k, 2600, fxZoom(), 0); if(a) a.onfinish = () => setTimeout(() => { if(curAnim===a) clearFx(); }, 500);
+      };
+      el.append(b, pv);
+      el.onclick = () => { const i = f.kinds.indexOf(k); if(i>=0) f.kinds.splice(i,1); else f.kinds.push(k); renderFx(); touch(); };
+      box.appendChild(el);
+    });
+  }
+  $('fxOn').onchange = e => { S.fx.on = e.target.checked; renderFx(); touch(); if(!NATIVE && S.fx.on) $('hintWeb').textContent = 'Внимание: эффекты движения собираются только в программе AutoCut для Windows. В браузерной версии они видны лишь в просмотре.'; };
+  $('fxEvery').onchange = e => { S.fx.every = e.target.value; touch(); };
+  $('fxOrder').onchange = e => { S.fx.order = e.target.value; touch(); };
+  $('fxPower').onchange = e => { S.fx.power = e.target.value; touch(); };
 
   /* ---------- channels, projects (tabs) and autosave ---------- */
   let DB = null, VIEW = 'work', activeId = null;
@@ -340,7 +432,7 @@
   function serialize(st){
     return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered};
+            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -362,7 +454,7 @@
     const st = newState(); states[id] = st;
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d) return st;
-    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered;
+    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {});
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
@@ -423,7 +515,7 @@
     $('modal').classList.remove('on');
     $('bPause').textContent = S.mode==='rec' ? 'Продолжить (P)' : 'Пауза (P)';
     lastShown = -1; computeWeights();
-    renderFiles(); refresh(); setMode(S.mode, S.label);
+    renderFiles(); renderFx(); refresh(); setMode(S.mode, S.label);
     showFrame(S.mode==='rec' ? S.idx : 0, S.mode==='idle');
   }
   function leave(){
@@ -699,9 +791,11 @@
     const stage = $('stage');
     if(n){
       let img = stage.querySelector('img');
-      if(!img){ stage.innerHTML = '<img alt=""><div class="badge"></div>'; img = stage.querySelector('img'); }
+      if(!img){ stage.innerHTML = '<div class="iw"><img alt=""></div><div class="badge"></div>'; img = stage.querySelector('img'); fitIw(); }
       if(img.dataset.i !== String(i)){ img.src = S.imgs[i].url; img.dataset.i = i; }
       stage.querySelector('.badge').textContent = S.imgs[i].name;
+      clearFx();
+      if(S.mode==='review' && S.starts[i]!=null){ const k = fxFor(i); if(k){ const a = playFx(k, durations()[i]*1000, fxZoom(), Math.max(0,(au.currentTime-S.starts[i])*1000)); if(a && au.paused) a.pause(); } }
     } else if(!stage.querySelector('.empty')){
       stage.innerHTML = '<div class="empty"><b>Готов к работе</b>Перетащите в окно картинки, озвучку и текст, потом нажмите «Начать запись».</div>';
     }
@@ -758,9 +852,9 @@
     $('modal').classList.add('on');
   }
   function togglePause(){
-    if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? 'Продолжить (P)' : 'Пауза (P)'; if(S.mode==='rec'){ S.pos = au.currentTime; touch(); } }
+    if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? 'Продолжить (P)' : 'Пауза (P)'; if(S.mode==='rec'){ S.pos = au.currentTime; touch(); } if(curAnim){ au.paused ? curAnim.pause() : curAnim.play(); } }
   }
-  au.addEventListener('ended', () => { if(S.mode==='rec' && au.currentTime > 0) S.dur = Math.max(S.dur, au.currentTime); if(S.mode==='rec') finish(); else if(S.mode==='review') setMode('done','Просмотр завершён'); });
+  au.addEventListener('ended', () => { if(S.mode==='rec' && au.currentTime > 0) S.dur = Math.max(S.dur, au.currentTime); if(S.mode==='rec') finish(); else if(S.mode==='review'){ clearFx(); setMode('done','Просмотр завершён'); } });
 
   /* ---------- review ---------- */
   function review(){
@@ -841,7 +935,7 @@
     NATIVE.onProgress(v => { $('rbar').style.width = (v*100)+'%'; $('rtxt').textContent = 'Собираю видео… '+Math.round(v*100)+'%'; });
     $('eRender').onclick = async () => {
       const d = durations();
-      const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i]}));
+      const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i], fx:fxFor(i), zoom:fxZoom()}));
       $('rwrap').style.display = 'block';
       if(!S.audioPath || frames.some(f=>!f.path)){ $('rtxt').textContent = 'Не удалось получить пути к файлам. Выберите файлы заново через кнопки слева.'; return; }
       $('rbar').style.width='0'; $('rtxt').textContent = 'Собираю видео… 0%';
