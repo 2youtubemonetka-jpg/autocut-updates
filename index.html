@@ -253,6 +253,7 @@
     </div>
 
     <button class="big" id="start" disabled>Начать запись</button>
+    <button class="btn" id="auto" disabled style="width:100%;margin-top:-6px" title="Программа сама найдёт, где заканчивается каждая строка, по паузам в озвучке">Разметить автоматически</button>
 
     <div class="keys" id="keys"></div>
   </aside>
@@ -684,7 +685,7 @@
   function loadAudio(f){
     if(!f) return;
     if(S.audioUrl) URL.revokeObjectURL(S.audioUrl);
-    S.audioUrl = URL.createObjectURL(f); S.audioName = f.name; S.audioPath = NATIVE ? NATIVE.pathFor(f) : ''; S.dur = 0;
+    S.audioFile = f; S.audioUrl = URL.createObjectURL(f); S.audioName = f.name; S.audioPath = NATIVE ? NATIVE.pathFor(f) : ''; S.dur = 0;
     au.src = S.audioUrl; renderFiles(); touch();
   }
   au.addEventListener('loadedmetadata', () => { S.dur = au.duration; if(S.resumePos!=null){ try{ au.currentTime = S.resumePos; }catch(e){} S.resumePos = null; } renderFiles(); refresh(); touch(); });
@@ -828,7 +829,7 @@
     $('bExport').disabled = !(S.starts.length && !rec);
     updStart(); touch();
   }
-  function updStart(){ $('start').disabled = !(S.imgs.length && S.dur) || (S.mode==='rec' && !au.paused); }
+  function updStart(){ $('start').disabled = !(S.imgs.length && S.dur) || (S.mode==='rec' && !au.paused); if(typeof updAuto==='function') updAuto(); }
   au.addEventListener('play', updStart); au.addEventListener('pause', updStart);
 
   /* ---------- recording ---------- */
@@ -1008,6 +1009,173 @@
     KEYS[id] = e.code; saveKeys(); renderKeys();
     toast(codeName(e.code)+': '+ACTIONS.find(a => a[0]===id)[1] + (swapped ? '. Клавиша снята с действия «'+swapped+'»' : ''));
   }
+
+  /* ---------- automatic marking ---------- */
+/* ---------- automatic frame alignment: text lines -> audio (pauses + speech-rate model) ---------- */
+const AutoAlign = (function(){
+  const HOP = 0.01;
+  function percentile(arr, p){ const a = Float32Array.from(arr).sort(); return a[Math.min(a.length-1, Math.max(0, Math.floor(p*(a.length-1))))]; }
+  function envelope(x, sr){
+    const hop = Math.max(1, Math.round(sr*HOP)), n = Math.floor(x.length/hop), db = new Float32Array(n);
+    for(let i=0;i<n;i++){ let s = 0; const o = i*hop; for(let j=0;j<hop;j++){ const v = x[o+j]; s += v*v; } db[i] = 10*Math.log10(s/hop + 1e-11); }
+    return db;
+  }
+  function smooth(db, w){ const o = new Float32Array(db.length), h = w>>1; for(let i=0;i<db.length;i++){ let s = 0, c = 0; for(let j=Math.max(0,i-h); j<=Math.min(db.length-1,i+h); j++){ s += db[j]; c++; } o[i] = s/c; } return o; }
+  // candidate places where one phrase may end and the next begin: real pauses + local energy dips
+  function candidates(db){
+    const sm = smooth(db, 2), n = sm.length, speech = percentile(sm, 0.90), floor = percentile(sm, 0.04);
+    const thr = Math.min(speech - 14, Math.max(floor + 0.35*(speech-floor), speech - 45));
+    const out = []; const inSil = new Uint8Array(n);
+    for(let i=0;i<n;){
+      if(sm[i] < thr){ let j = i, mn = sm[i]; while(j < n && sm[j] < thr){ mn = Math.min(mn, sm[j]); inSil[j] = 1; j++; }
+        const len = (j-i)*HOP; if(len >= 0.03) out.push({s:i*HOP, e:j*HOP, len, depth:Math.min(1,(speech-mn)/40), cut:i*HOP + Math.min(len*0.5, 0.3), sil:true}); i = j; }
+      else i++;
+    }
+    // dips outside silences: prominent local minima of the energy envelope
+    const R = 15, MIN = 4;
+    for(let i=MIN;i<n-MIN;i++){
+      if(inSil[i]) continue; const v = sm[i];
+      let isMin = true; for(let j=i-MIN;j<=i+MIN;j++){ if(sm[j] < v){ isMin = false; break; } } if(!isMin) continue;
+      let l = -1e9, r = -1e9; for(let j=Math.max(0,i-R); j<i; j++) l = Math.max(l, sm[j]); for(let j=i+1; j<=Math.min(n-1,i+R); j++) r = Math.max(r, sm[j]);
+      const prom = Math.min(l, r) - v; if(prom < 9) continue;
+      let w = 1; while(i+w < n && sm[i+w] < v+6 && w < 40) w++; let w2 = 1; while(i-w2 >= 0 && sm[i-w2] < v+6 && w2 < 40) w2++;
+      out.push({s:(i-w2)*HOP, e:(i+w)*HOP, len:(w+w2)*HOP, depth:Math.min(1,prom/35), cut:i*HOP, sil:false});
+    }
+    out.sort((a,b) => a.cut - b.cut);
+    // merge candidates closer than 60 ms (keep the stronger one)
+    const m = [];
+    for(const c of out){ const p = m[m.length-1]; if(p && c.cut - p.cut < 0.06){ if(c.len*(0.5+c.depth) > p.len*(0.5+p.depth)) m[m.length-1] = c; } else m.push(c); }
+    let first = 0; while(first < n && sm[first] < thr) first++;
+    let last = n-1; while(last > 0 && sm[last] < thr) last--;
+    return {cands: m, speechStart: first*HOP, speechEnd: (last+1)*HOP, thr, speech, floor};
+  }
+  // text -> "speech weight" (letters and digits only; pauses are measured from the audio itself)
+  function weight(line){
+    let w = 0; for(const ch of line){ if(/\p{N}/u.test(ch)) w += 4; else if(/\p{L}/u.test(ch)) w += 1; else if(ch===' ') w += 0.6; }
+    return Math.max(2, w);
+  }
+  const SENT = /[.!?…]["')»\]]*$/;
+  // sentence ends of the whole script: weight position + which line they close
+  function sentenceEnds(lines){
+    const ends = []; let v = 0;
+    lines.forEach((line, k) => {
+      const t = line.trim(); let cur = 0; const re = /[.!?…]+["')»\]]*(?=\s+\S)/g; let m;
+      while((m = re.exec(t))){ ends.push({v: v + weight(t.slice(0, m.index + m[0].length)), line:k, last:false}); }
+      v += weight(line);
+      if(SENT.test(t)) ends.push({v, line:k, last:true});
+    });
+    return {ends, total:v};
+  }
+  function align(lines, db, total){
+    const C = candidates(db), N = lines.length, cands = C.cands;
+    const starts = [0], kinds = [];
+    if(N < 2) return {starts, kinds, found:0, guessed:0};
+    // speech-time axis: time with long pauses removed
+    const runs = cands.filter(c => c.sil && c.len >= 0.1).map(c => [c.s, c.e]);
+    const pref = [0]; runs.forEach(r => pref.push(pref[pref.length-1] + (r[1]-r[0])));
+    const quiet = t => { let lo = 0, hi = runs.length; while(lo < hi){ const m = (lo+hi)>>1; if(runs[m][1] <= t) lo = m+1; else hi = m; }
+      let q = pref[lo]; if(lo < runs.length && runs[lo][0] < t) q += t - runs[lo][0]; return q; };
+    const U = t => t - quiet(t);
+    const tOfU = u => { let lo = 0, hi = total; for(let i=0;i<40;i++){ const m = (lo+hi)/2; if(U(m) < u) lo = m; else hi = m; } return hi; };
+    const u0 = U(C.speechStart), u1 = U(C.speechEnd);
+    const T = sentenceEnds(lines); const V = T.total;
+    const rate = Math.max(1e-4, (u1-u0)/V);
+    // 1) match sentence ends of the text with long pauses of the audio
+    const S = cands.filter(c => c.sil && c.len >= 0.25 && c.s > C.speechStart && c.e < C.speechEnd).map(c => ({c, u:U(c.s)}));
+    const A = T.ends.filter(e => !(e.last && e.line === N-1));
+    const INF = 1e18, nA = A.length, nS = S.length;
+    const dp = Array.from({length:nA+1}, () => new Float64Array(nS+1).fill(INF)), bp = Array.from({length:nA+1}, () => new Int32Array((nS+1)).fill(-1));
+    // index 0 = virtual start; anchors 1..nA; silences 1..nS
+    dp[0][0] = 0;
+    const cost = (dv, du, di, dj) => { if(du < 0.15 || dv <= 0) return INF; const r = Math.log(du/(dv*rate)); return Math.min(9, 5*r*r) + 0.7*(di-1) + 0.45*(dj-1); };
+    for(let i=1;i<=nA;i++){
+      for(let j=1;j<=nS;j++){
+        let best = INF, from = -1;
+        for(let di=1; di<=4 && i-di>=0; di++){
+          for(let dj=1; dj<=5 && j-dj>=0; dj++){
+            const pi = i-di, pj = j-dj; if(dp[pi][pj] >= INF) continue;
+            const pv = pi===0 ? 0 : A[pi-1].v, pu = pi===0 ? u0 : S[pj-1].u;
+            const c = dp[pi][pj] + cost(A[i-1].v - pv, S[j-1].u - pu, di, dj);
+            if(c < best){ best = c; from = pi*(nS+1)+pj; }
+          }
+        }
+        dp[i][j] = best; bp[i][j] = from;
+      }
+    }
+    // end: virtual end anchor (v=V, u=u1)
+    let bi = 0, bj = 0, bc = INF;
+    for(let i=0;i<=nA;i++) for(let j=0;j<=nS;j++){ if(dp[i][j] >= INF) continue;
+      const pv = i===0 ? 0 : A[i-1].v, pu = i===0 ? u0 : S[j-1].u; const c = dp[i][j] + cost(V - pv, u1 - pu, nA-i+1, nS-j+1);
+      if(c < bc){ bc = c; bi = i; bj = j; } }
+    const match = new Map();       // anchor index -> silence
+    for(let i=bi, j=bj; i>0; ){ match.set(i-1, S[j-1]); const f = bp[i][j]; if(f < 0) break; i = Math.floor(f/(nS+1)); j = f % (nS+1); }
+    // control points (v,u) for interpolation
+    const ctl = [{v:0, u:u0}]; A.forEach((e,i) => { if(match.has(i)) ctl.push({v:e.v, u:match.get(i).u}); }); ctl.push({v:V, u:u1});
+    const uAt = v => { let k = 0; while(k < ctl.length-2 && ctl[k+1].v < v) k++; const a = ctl[k], b = ctl[k+1]; return a.u + (b.u-a.u)*((v-a.v)/Math.max(1e-6,b.v-a.v)); };
+    // 2) boundaries
+    let v = 0, found = 0, guessed = 0;
+    for(let k=0;k<N-1;k++){
+      v += weight(lines[k]);
+      const ai = A.findIndex(e => e.last && e.line === k);
+      let t, kind;
+      if(ai >= 0 && match.has(ai)){ t = match.get(ai).c.cut; kind = 'strong'; found++; }
+      else {
+        const pred = tOfU(uAt(v));
+        const endsComma = /[,;:—–]$/.test(lines[k].trim());
+        let bestC = null, bs = 0.35;           // minimal score to prefer a candidate over the prediction
+        for(const c of cands){
+          if(c.cut < pred-0.6) continue; if(c.cut > pred+0.6) break;
+          const dist = Math.abs(c.cut - pred);
+          const sc = (c.depth*0.9 + Math.min(c.len,0.3)*2.2 + (endsComma && c.sil ? 0.3 : 0)) - dist*dist/0.18;
+          if(sc > bs){ bs = sc; bestC = c; }
+        }
+        if(bestC){ t = bestC.cut; kind = bestC.sil ? 'pause' : 'dip'; found++; } else { t = pred; kind = 'virtual'; guessed++; }
+      }
+      const prev = starts[starts.length-1]; if(t < prev + 0.3) t = prev + 0.3;
+      starts.push(t); kinds.push(kind);
+    }
+    return {starts, kinds, found, guessed, anchors: match.size + '/' + A.length, rate};
+  }
+  return {envelope, candidates, align};
+})();
+
+
+  async function decodeMono(){
+    let buf;
+    if(S.audioFile) buf = await S.audioFile.arrayBuffer();
+    else { const r = await fetch(S.audioUrl); buf = await r.arrayBuffer(); }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC({sampleRate:16000});
+    const ab = await ctx.decodeAudioData(buf); try{ ctx.close(); }catch(e){}
+    return ab.getChannelData(0);
+  }
+  function updAuto(){ $('auto').disabled = !(S.imgs.length && S.dur && S.lines.length) || S.autoBusy || (S.mode==='rec' && !au.paused); }
+  au.addEventListener('play', updAuto); au.addEventListener('pause', updAuto);
+  $('auto').onclick = async () => {
+    const n = S.imgs.length;
+    if(S.lines.length !== n){ $('msg').textContent = 'Для авторазметки картинок и строк текста должно быть поровну: сейчас '+n+' и '+S.lines.length+'.'; return; }
+    if(S.starts.length>1 && S.mode!=='idle' && !confirm('Старая разметка этого проекта будет заменена. Продолжить?')) return;
+    S.autoBusy = true; updAuto(); $('auto').textContent = 'Анализирую звук…'; $('msg').textContent = 'Анализирую озвучку, это займёт несколько секунд…';
+    try{
+      au.pause();
+      const x = await decodeMono();
+      await new Promise(r => setTimeout(r, 30));
+      const db = AutoAlign.envelope(x, 16000);
+      const res = AutoAlign.align(S.lines, db, x.length/16000);
+      if(res.starts.length !== n) throw new Error('число кадров не совпало');
+      S.starts = res.starts; S.idx = 0; S.pos = 0; S.rendered = false;
+      if(x.length/16000 > 1) S.dur = Math.max(S.dur, x.length/16000);
+      S.autoInfo = {found:res.found, guessed:res.guessed};
+      setMode('done','Авторазметка готова: проверьте в просмотре');
+      const bad = res.guessed / Math.max(1,n-1);
+      $('msg').textContent = 'Готово. Границ найдено по звуку: '+res.found+', оценено по тексту: '+res.guessed+(bad>0.25 ? '. Много оценённых по тексту, проверьте результат внимательно.' : '.');
+      toast('Разметка готова. Запускаю просмотр');
+      renderFiles(); review();
+    }catch(err){
+      $('msg').textContent = 'Не удалось разметить автоматически: '+(err && err.message ? err.message : err);
+    }
+    S.autoBusy = false; $('auto').textContent = 'Разметить автоматически'; updAuto();
+  };
 
   /* ---------- volume ---------- */
   let vol = 100, muted = false;
