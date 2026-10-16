@@ -319,6 +319,7 @@
     <button class="btn" id="auto" disabled style="width:100%;margin-top:-6px" title="Программа сама найдёт, где заканчивается каждая строка, по паузам в озвучке">Разметить автоматически</button>
 
     <div class="keys" id="keys"></div>
+    <button class="btn" id="supOpen" style="width:100%;margin-top:10px">Поддержка</button>
   </aside>
 
   <main class="main" id="work">
@@ -399,6 +400,17 @@
 </div>
 
 <div class="dropall" id="dropall">Отпустите файлы: картинки, озвучку или текст</div>
+
+<div class="modal" id="supModal">
+  <div class="card" style="width:min(460px,92vw)">
+    <h2>Поддержка</h2>
+    <p style="margin:0 0 12px;color:var(--dim);font-size:14px;line-height:1.5">Пишите, пожалуйста, только по делу: если нашли баг, что-то сломалось или есть идея, как сделать программу лучше. Просто так не пишите. <b style="color:var(--text)">Отвечаем быстро.</b></p>
+    <div class="row" style="margin-bottom:8px"><div style="flex:1;font:600 16px/1.2 inherit">@DominatingOverYou</div><button class="btn" data-copy="@DominatingOverYou" style="width:auto;margin:0;padding:7px 12px">Копировать</button></div>
+    <div class="row" style="margin-bottom:12px"><div style="flex:1;font:600 16px/1.2 inherit">@HasYst</div><button class="btn" data-copy="@HasYst" style="width:auto;margin:0;padding:7px 12px">Копировать</button></div>
+    <div class="hint" style="margin:0 0 10px">Это имена в Telegram: скопируйте и найдите через поиск. Для багов приложите скриншот и напишите версию программы (она в левом верхнем углу).</div>
+    <button class="btn" id="supClose">Закрыть</button>
+  </div>
+</div>
 
 <div class="modal" id="genModal">
   <div class="card" style="width:min(720px,94vw)">
@@ -765,6 +777,14 @@
     $('gStart').onclick = genStart; $('gStop').onclick = () => { G.tok++; G.stop = true; try{ if(G.cdp) G.cdp.ws.close(); }catch(e){} G.cdp = null; G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none'; glog('Остановлено. Сделанные картинки сохранены, «Старт» продолжит с места остановки.'); genStat(); };
     $('gUse').onclick = genUse; $('gClose').onclick = () => $('genModal').classList.remove('on');
   }
+
+  /* ---------- support ---------- */
+  $('supOpen').onclick = () => $('supModal').classList.add('on');
+  $('supClose').onclick = () => $('supModal').classList.remove('on');
+  $('supModal').addEventListener('click', e => { if(e.target === $('supModal')) $('supModal').classList.remove('on'); });
+  document.querySelectorAll('#supModal [data-copy]').forEach(b => b.onclick = async () => {
+    try{ await navigator.clipboard.writeText(b.dataset.copy); toast('Скопировано: '+b.dataset.copy); }catch(e){ toast('Выделите и скопируйте вручную: '+b.dataset.copy); }
+  });
 
   /* ---------- channels, projects (tabs) and autosave ---------- */
   let DB = null, VIEW = 'work', activeId = null;
