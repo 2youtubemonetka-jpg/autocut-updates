@@ -12,6 +12,12 @@
     --stage:#0a0b0e; --overlay:rgba(15,17,21,.85); --toast:#222733; --done:#f2d680; --now:#ff5a66; --nowbg:rgba(230,57,70,.20); --tint:rgba(230,57,70,.12);
     color-scheme:dark;
   }
+  :root[data-theme=purple]{
+    --bg:#120d1f; --panel:#1b1430; --panel2:#251b42; --line:#3b2c63;
+    --text:#f2edff; --dim:#a99bd0; --accent:#8f4dff; --accent2:#ffc857; --ok:#4ade9a; --warn:#ffb74d;
+    --stage:#0c0818; --overlay:rgba(18,13,31,.88); --toast:#251b42; --done:#ffd479; --now:#ff7ad9; --nowbg:rgba(255,122,217,.18); --tint:rgba(143,77,255,.16);
+    color-scheme:dark;
+  }
   :root[data-theme=light]{
     --bg:#f3f4f7; --panel:#ffffff; --panel2:#eceef3; --line:#d5d9e2;
     --text:#161922; --dim:#5d6578; --accent:#d62839; --accent2:#c98300; --ok:#14935c; --warn:#b36b00;
@@ -109,6 +115,9 @@
 
 
   /* nav + toast */
+  .themes{display:flex;gap:5px;margin-left:8px}
+  .themes button{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);padding:0}
+  .themes button.on{border-color:var(--text)}
   .nav{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .nav button{padding:8px 6px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;font-size:13.5px;color:var(--dim)}
   .nav button.on{background:var(--tint);border-color:var(--accent);color:var(--text);font-weight:600}
@@ -149,11 +158,11 @@
 </style>
 </head>
 <body>
-<script>try{var th=localStorage.getItem('autocut.theme'); if(th==='light') document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<script>try{var th=localStorage.getItem('autocut.theme'); if(th==='light'||th==='purple') document.documentElement.setAttribute('data-theme',th);}catch(e){}</script>
 <div class="app">
 
   <aside class="side">
-    <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small><button class="mini" id="theme" title="Сменить тему: тёмная / светлая" style="width:auto;padding:0 9px;font-size:12px;height:28px"></button></div>
+    <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small><span class="themes" id="themes" title="Цвет интерфейса"><button data-t="dark" style="background:#e63946" title="Тёмная"></button><button data-t="purple" style="background:#8f4dff" title="Фиолетовая"></button><button data-t="light" style="background:#e9ebf1" title="Светлая"></button></span></div>
 
     <div class="nav"><button id="navWork" class="on">Работа</button><button id="navLib">Библиотека<span id="libCnt">0</span></button></div>
 
@@ -291,12 +300,12 @@
 
   /* ---------- theme ---------- */
   function applyTheme(t){
-    if(t==='light') document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme');
-    $('theme').textContent = t==='light' ? 'Тёмная' : 'Светлая';
+    if(t==='light' || t==='purple') document.documentElement.setAttribute('data-theme',t); else { t = 'dark'; document.documentElement.removeAttribute('data-theme'); }
+    document.querySelectorAll('#themes button').forEach(b => b.classList.toggle('on', b.dataset.t===t));
     try{ localStorage.setItem('autocut.theme', t); }catch(e){}
   }
-  $('theme').onclick = () => applyTheme(document.documentElement.getAttribute('data-theme')==='light' ? 'dark' : 'light');
-  applyTheme(document.documentElement.getAttribute('data-theme')==='light' ? 'light' : 'dark');
+  document.querySelectorAll('#themes button').forEach(b => b.onclick = () => applyTheme(b.dataset.t));
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
 
   /* ---------- channels, projects (tabs) and autosave ---------- */
   let DB = null, VIEW = 'work', activeId = null;
