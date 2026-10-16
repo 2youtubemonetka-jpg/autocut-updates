@@ -142,6 +142,24 @@
   .keys button.kb.none{color:var(--dim);border-style:dashed}
   @keyframes blink{50%{opacity:.55}}
   .keyreset{grid-column:1/-1;background:none;border:0;color:var(--dim);font-size:12px;text-align:left;padding:0;text-decoration:underline;cursor:pointer;margin-top:2px}
+  /* editor */
+  .editor{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px 9px;display:none;flex:none}
+  .edhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px;color:var(--dim)}
+  .edhead b{color:var(--text);font-weight:600}
+  .edhead .grow{flex:1}
+  .edb{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-size:12.5px;color:var(--text)}
+  .edb:hover:not(:disabled){border-color:var(--accent2)}
+  .edb:disabled{opacity:.4;cursor:not-allowed}
+  .edb.danger:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .edb.go{background:var(--tint);border-color:var(--accent)}
+  .tlwrap{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--stage);height:104px}
+  .tlwrap canvas{display:block}
+  .edscroll{width:100%;margin:5px 0 2px;accent-color:var(--accent);height:10px}
+  .edtools{display:grid;gap:6px;margin-top:4px}
+  .edrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--dim)}
+  .edrow .lbl{min-width:112px}
+  .edrow input[type=text]{flex:1;min-width:160px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 9px;color:var(--text);font:inherit;font-size:13px}
+  .edrow input[type=text]:focus{outline:none;border-color:var(--accent2)}
   /* nav + toast */
   .themes{display:flex;gap:5px;margin-left:8px}
   .themes button{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);padding:0}
@@ -272,6 +290,32 @@
       <div class="empty"><b>Готов к работе</b>Перетащите в окно картинки, озвучку и текст, потом нажмите «Начать запись».</div>
     </div>
     <div class="textnext"><em>Дальше</em><span id="nxt">—</span></div>
+    <div class="editor" id="editor">
+      <div class="edhead">
+        <b id="edInfo">Кадр</b>
+        <span class="grow"></span>
+        <button class="edb" id="edUndo" title="Отменить (Ctrl+Z)">Отменить</button>
+        <button class="edb" id="edRedo" title="Повторить (Ctrl+Y)">Повторить</button>
+        <button class="edb" id="edZm" title="Уменьшить масштаб">&minus;</button>
+        <button class="edb" id="edZp" title="Увеличить масштаб">+</button>
+        <button class="edb" id="edFit" title="Показать всю озвучку">Всё</button>
+      </div>
+      <div class="tlwrap" id="tlwrap"><canvas id="tl"></canvas></div>
+      <input type="range" class="edscroll" id="tlScroll" min="0" max="1000" value="0">
+      <div class="edtools">
+        <div class="edrow"><span class="lbl">Граница слева</span>
+          <button class="edb" data-nl="-0.5">-0.5</button><button class="edb" data-nl="-0.1">-0.1</button><button class="edb" data-nl="0.1">+0.1</button><button class="edb" data-nl="0.5">+0.5</button>
+          <button class="edb" id="edLNow">= курсор</button><button class="edb go" id="edLPlay">Послушать</button></div>
+        <div class="edrow"><span class="lbl">Граница справа</span>
+          <button class="edb" data-nr="-0.5">-0.5</button><button class="edb" data-nr="-0.1">-0.1</button><button class="edb" data-nr="0.1">+0.1</button><button class="edb" data-nr="0.5">+0.5</button>
+          <button class="edb" id="edRNow">= курсор</button><button class="edb go" id="edRPlay">Послушать</button></div>
+        <div class="edrow"><span class="lbl">Кадр</span>
+          <button class="edb" id="edSplit" title="Разрезать кадр в месте курсора на два">Разрезать здесь</button>
+          <button class="edb danger" id="edDel" title="Убрать кадр, его время отдаётся предыдущему">Удалить кадр</button>
+          <button class="edb" id="edImg">Заменить картинку</button><input type="file" id="edImgFile" accept="image/*" style="display:none">
+          <input type="text" id="edTxt" placeholder="Текст кадра" spellcheck="false"></div>
+      </div>
+    </div>
     <div class="prog"><div id="bar"></div></div>
     <div class="ctrl">
       <button class="btn" id="bBack" disabled>← Назад</button>
@@ -652,6 +696,7 @@
     $('lib').style.display = v==='lib' ? 'flex' : 'none';
     $('navWork').classList.toggle('on', v==='work'); $('navLib').classList.toggle('on', v==='lib');
     if(v==='lib'){ if(activeId) saveProject(activeId); renderLibrary(); }
+    syncEditor();
   }
   $('navWork').onclick = () => setView('work');
   $('navLib').onclick = () => setView('lib');
@@ -685,7 +730,7 @@
   function loadAudio(f){
     if(!f) return;
     if(S.audioUrl) URL.revokeObjectURL(S.audioUrl);
-    S.audioFile = f; S.audioUrl = URL.createObjectURL(f); S.audioName = f.name; S.audioPath = NATIVE ? NATIVE.pathFor(f) : ''; S.dur = 0;
+    S.peaks = null; S.peaksBusy = false; S.audioFile = f; S.audioUrl = URL.createObjectURL(f); S.audioName = f.name; S.audioPath = NATIVE ? NATIVE.pathFor(f) : ''; S.dur = 0;
     au.src = S.audioUrl; renderFiles(); touch();
   }
   au.addEventListener('loadedmetadata', () => { S.dur = au.duration; if(S.resumePos!=null){ try{ au.currentTime = S.resumePos; }catch(e){} S.resumePos = null; } renderFiles(); refresh(); touch(); });
@@ -827,7 +872,7 @@
     $('bPause').disabled = !(rec||rev);
     $('bReview').disabled = !(S.starts.length && !rec);
     $('bExport').disabled = !(S.starts.length && !rec);
-    updStart(); touch();
+    updStart(); touch(); if(typeof syncEditor==='function') syncEditor();
   }
   function updStart(){ $('start').disabled = !(S.imgs.length && S.dur) || (S.mode==='rec' && !au.paused); if(typeof updAuto==='function') updAuto(); }
   au.addEventListener('play', updStart); au.addEventListener('pause', updStart);
@@ -886,6 +931,7 @@
       const i = frameAt(au.currentTime);
       if(i!==lastShown){ lastShown=i; showFrame(i); }
     }
+    edTick();
     if(S.mode==='rec' || S.mode==='review'){
       const fi = S.mode==='rec' ? S.idx : lastShown;
       if(fi>=0) setHL(currentWord(fi));
@@ -1177,6 +1223,184 @@ const AutoAlign = (function(){
     S.autoBusy = false; $('auto').textContent = 'Разметить автоматически'; updAuto();
   };
 
+  /* ---------- editor: timeline, seeking, basic editing ---------- */
+  const ED = {pps:40, view:0, w:600, h:104, drag:null, scrub:false, undo:[], redo:[], playTok:0};
+  const tl = $('tl'), tctx = tl.getContext('2d');
+  const edOn = () => VIEW==='work' && S.starts.length>1 && (S.mode==='done' || S.mode==='review');
+  const xOf = t => (t - ED.view)*ED.pps, tOf = x => ED.view + x/ED.pps;
+  const nowT = () => au.currentTime || 0;
+  let edDirty = true;
+  function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; }
+  function sizeTl(){
+    const w = Math.max(200, $('tlwrap').clientWidth), dpr = window.devicePixelRatio || 1;
+    ED.w = w; tl.width = Math.round(w*dpr); tl.height = Math.round(ED.h*dpr); tl.style.width = w+'px'; tl.style.height = ED.h+'px';
+    tctx.setTransform(dpr,0,0,dpr,0,0); edDirty = true;
+  }
+  function clampView(){ const span = ED.w/ED.pps; ED.view = Math.max(0, Math.min(Math.max(0, S.dur - span), ED.view)); }
+  function setZoom(pps, anchorT){
+    const aT = anchorT==null ? nowT() : anchorT, ax = xOf(aT);
+    ED.pps = Math.max(ED.w/Math.max(1,S.dur), Math.min(500, pps)); ED.view = aT - ax/ED.pps; clampView(); edDirty = true;
+  }
+  function ensurePeaks(){
+    if(S.peaks || S.peaksBusy || !S.audioUrl) return;
+    const st = S; st.peaksBusy = true;
+    decodeMono().then(x => {
+      const n = Math.floor(x.length/160), p = new Float32Array(n);
+      for(let i=0;i<n;i++){ let m = 0; const o = i*160; for(let j=0;j<160;j++){ const v = Math.abs(x[o+j]); if(v>m) m = v; } p[i] = m; }
+      const sorted = Float32Array.from(p).sort(); const ref = Math.max(0.02, sorted[Math.floor(sorted.length*0.995)] || 0.1);
+      for(let i=0;i<n;i++) p[i] = Math.min(1, p[i]/ref);
+      st.peaks = p; st.peaksBusy = false; edDirty = true;
+    }).catch(() => { st.peaksBusy = false; st.peaksFail = true; });
+  }
+  function niceStep(pps){ const want = 80/pps; for(const s of [0.1,0.2,0.5,1,2,5,10,15,30,60,120,300,600]) if(s >= want) return s; return 600; }
+  const mmss = t => { const m = Math.floor(t/60), s = t - m*60; return m+':'+(s<10?'0':'')+s.toFixed(s%1 ? 1 : 0); };
+  function drawTl(){
+    const W = ED.w, H = ED.h, c = tctx; if(!S.starts.length) return;
+    clampView();
+    const bg = cssv('--stage'), dim = cssv('--dim'), txt = cssv('--text'), acc = cssv('--accent'), acc2 = cssv('--accent2'), line = cssv('--line');
+    c.clearRect(0,0,W,H); c.fillStyle = bg; c.fillRect(0,0,W,H);
+    const n = S.starts.length, cur = frameAt(nowT()), RUL = 18;
+    // frames
+    let lo = 0, hi = n-1, f0 = 0; while(lo<=hi){ const m = (lo+hi)>>1; if(S.starts[m] <= ED.view){ f0 = m; lo = m+1; } else hi = m-1; }
+    c.font = '11px system-ui,sans-serif'; c.textBaseline = 'top';
+    for(let i=f0;i<n;i++){
+      const a = xOf(S.starts[i]), b = xOf(i<n-1 ? S.starts[i+1] : S.dur); if(a > W) break;
+      c.globalAlpha = i===cur ? 0.34 : (i%2 ? 0.10 : 0.18); c.fillStyle = i===cur ? acc2 : acc; c.fillRect(Math.max(0,a), RUL, Math.max(1,b-Math.max(0,a)), H-RUL);
+      c.globalAlpha = 1; c.fillStyle = line; c.fillRect(Math.round(a), RUL, 1, H-RUL);
+      if(b-a >= 26){ c.fillStyle = i===cur ? txt : dim; c.fillText(String(i+1), Math.max(a,0)+4, RUL+3); }
+    }
+    // waveform
+    const mid = RUL + (H-RUL)/2 + 6, amp = (H-RUL)/2 - 12;
+    if(S.peaks){
+      c.fillStyle = txt; c.globalAlpha = 0.75;
+      for(let x=0;x<W;x++){ const a = Math.max(0, Math.floor(tOf(x)*100)), b = Math.min(S.peaks.length, Math.max(a+1, Math.floor(tOf(x+1)*100))); if(a >= S.peaks.length) break;
+        let m = 0; for(let k=a;k<b;k++) if(S.peaks[k] > m) m = S.peaks[k]; const h = Math.max(1, m*amp); c.fillRect(x, mid-h, 1, h*2); }
+      c.globalAlpha = 1;
+    } else { c.fillStyle = dim; c.fillText(S.peaksFail ? 'Волна недоступна' : 'Загружаю волну…', 8, mid-6); }
+    // ruler
+    c.fillStyle = bg; c.fillRect(0,0,W,RUL); c.strokeStyle = line; c.beginPath(); c.moveTo(0,RUL+.5); c.lineTo(W,RUL+.5); c.stroke();
+    const step = niceStep(ED.pps); c.fillStyle = dim;
+    for(let t = Math.ceil(ED.view/step)*step; t < ED.view + W/ED.pps; t += step){ const x = Math.round(xOf(t)); c.fillRect(x, RUL-5, 1, 5); c.fillText(mmss(t), x+3, 2); }
+    // boundary handles
+    c.fillStyle = acc2;
+    for(let i=1;i<n;i++){ const x = xOf(S.starts[i]); if(x < -4) continue; if(x > W+4) break; c.fillRect(Math.round(x)-1, RUL, 2, H-RUL); }
+    // playhead
+    const px = xOf(nowT()); if(px >= -6 && px <= W+6){ c.fillStyle = acc; c.fillRect(Math.round(px)-1, 0, 2, H); c.beginPath(); c.moveTo(px-6,0); c.lineTo(px+6,0); c.lineTo(px,9); c.closePath(); c.fill(); }
+    edDirty = false;
+  }
+  function edInfo(){
+    const n = S.starts.length, i = frameAt(nowT()), st = S.starts[i], en = i<n-1 ? S.starts[i+1] : S.dur;
+    $('edInfo').textContent = 'Кадр '+(i+1)+' из '+n+' · начало '+mmss(st)+' · длина '+(en-st).toFixed(1)+' с';
+    const tx = $('edTxt'); if(document.activeElement !== tx && tx.dataset.i !== String(i)+'|'+(S.lines[i]||'')){ tx.value = S.lines[i] || ''; tx.dataset.i = String(i)+'|'+(S.lines[i]||''); }
+    $('edUndo').disabled = !ED.undo.length; $('edRedo').disabled = !ED.redo.length;
+    $('edDel').disabled = n <= 2; $('edSplit').disabled = !canSplit(i);
+    document.querySelectorAll('[data-nl],#edLNow,#edLPlay').forEach(b => b.disabled = i===0);
+    document.querySelectorAll('[data-nr],#edRNow,#edRPlay').forEach(b => b.disabled = i>=n-1);
+    const sc = $('tlScroll'), span = ED.w/ED.pps, rng = Math.max(0.001, S.dur - span);
+    if(document.activeElement !== sc) sc.value = Math.round(Math.min(1, ED.view/rng)*1000);
+  }
+  const snap = () => ({starts:S.starts.slice(), imgs:S.imgs.slice(), lines:S.lines.slice(), idx:S.idx});
+  function pushUndo(sn){ ED.undo.push(sn || snap()); if(ED.undo.length > 80) ED.undo.shift(); ED.redo.length = 0; }
+  function restore(sn){ S.starts = sn.starts.slice(); S.imgs = sn.imgs.slice(); S.lines = sn.lines.slice(); computeWeights(); S.rendered = false; afterEdit(); }
+  function undo(){ if(!ED.undo.length) return; ED.redo.push(snap()); restore(ED.undo.pop()); }
+  function redo(){ if(!ED.redo.length) return; ED.undo.push(snap()); restore(ED.redo.pop()); }
+  function afterEdit(){ S.rendered = false; lastShown = -1; edDirty = true; touch(); refresh(); syncEditor(); }
+  function fillLines(){ while(S.lines.length < S.imgs.length) S.lines.push(''); }
+  const curI = () => frameAt(nowT());
+  function seekTo(t){
+    t = Math.max(0, Math.min(Math.max(0,S.dur-0.05), t));
+    if(S.mode==='done'){ setMode('review','Редактор: перематывайте шкалу, правьте границы'); au.pause(); $('bPause').textContent = pauseTxt(1); }
+    if(S.mode==='review'){ ED.playTok++; au.currentTime = t; lastShown = -1; }
+    edDirty = true;
+  }
+  function gotoFrame(i){ i = Math.max(0, Math.min(S.starts.length-1, i)); seekTo(S.starts[i] + (i>0 ? 0.001 : 0)); const x = xOf(S.starts[i]); if(x < 20 || x > ED.w-80){ ED.view = S.starts[i] - (ED.w/ED.pps)*0.2; clampView(); } }
+  function moveBoundary(i, t, commit){       // boundary = start of frame i
+    const lo = S.starts[i-1] + 0.1, hi = (i < S.starts.length-1 ? S.starts[i+1] : S.dur) - 0.1;
+    if(hi < lo) return false; S.starts[i] = Math.max(lo, Math.min(hi, t)); return true;
+  }
+  function nudge(side, d){
+    const i = curI(), b = side==='l' ? i : i+1; if(b < 1 || b >= S.starts.length) return;
+    pushUndo(); moveBoundary(b, S.starts[b] + d); afterEdit(); au.currentTime = S.starts[b]; lastShown = -1;
+  }
+  function boundaryNow(side){ const i = curI(), b = side==='l' ? i : i+1; if(b < 1 || b >= S.starts.length) return; pushUndo(); moveBoundary(b, nowT()); afterEdit(); }
+  function playAround(side){
+    const i = curI(), b = side==='l' ? i : i+1; if(b < 1 || b >= S.starts.length) return;
+    const t0 = Math.max(0, S.starts[b]-1.3); seekTo(t0); const tok = ++ED.playTok; au.play(); $('bPause').textContent = pauseTxt(0);
+    setTimeout(() => { if(tok===ED.playTok && S.mode==='review'){ au.pause(); $('bPause').textContent = pauseTxt(1); } }, 2700);
+  }
+  const canSplit = i => { const en = i<S.starts.length-1 ? S.starts[i+1] : S.dur, t = nowT(); return t > S.starts[i]+0.25 && t < en-0.25; };
+  function splitHere(){
+    const i = curI(); if(!canSplit(i)) { toast('Поставьте курсор внутрь кадра, не у самой границы'); return; }
+    fillLines(); pushUndo();
+    S.starts.splice(i+1, 0, nowT()); S.imgs.splice(i+1, 0, Object.assign({}, S.imgs[i])); S.lines.splice(i+1, 0, '');
+    computeWeights(); afterEdit(); toast('Кадр разрезан. Новый кадр использует ту же картинку');
+  }
+  function deleteFrame(){
+    const n = S.starts.length, i = curI(); if(n <= 2) return;
+    if(!confirm('Удалить кадр '+(i+1)+'? Его время отойдёт соседнему кадру, картинка уйдёт из проекта.')) return;
+    fillLines(); pushUndo();
+    S.starts.splice(i,1); S.imgs.splice(i,1); S.lines.splice(i,1); S.starts[0] = 0;
+    computeWeights(); afterEdit(); toast('Кадр удалён');
+  }
+  $('edImg').onclick = () => $('edImgFile').click();
+  $('edImgFile').onchange = e => {
+    const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+    const i = curI(); pushUndo();
+    S.imgs[i] = {name:f.name, url:URL.createObjectURL(f), path: NATIVE ? NATIVE.pathFor(f) : ''};
+    afterEdit(); toast('Картинка заменена');
+  };
+  $('edTxt').onfocus = () => { ED.txtSnap = snap(); };
+  $('edTxt').oninput = e => { const i = curI(); fillLines(); S.lines[i] = e.target.value; $('edTxt').dataset.i = String(i)+'|'+e.target.value; computeWeights(); lastShown = -1; touch(); };
+  $('edTxt').onchange = () => { if(ED.txtSnap){ pushUndo(ED.txtSnap); ED.txtSnap = null; } $('edTxt').blur(); };
+  $('edUndo').onclick = undo; $('edRedo').onclick = redo;
+  $('edZp').onclick = () => setZoom(ED.pps*1.6); $('edZm').onclick = () => setZoom(ED.pps/1.6);
+  $('edFit').onclick = () => { ED.pps = ED.w/Math.max(1,S.dur); ED.view = 0; edDirty = true; };
+  $('edSplit').onclick = splitHere; $('edDel').onclick = deleteFrame;
+  document.querySelectorAll('[data-nl]').forEach(b => b.onclick = () => nudge('l', parseFloat(b.dataset.nl)));
+  document.querySelectorAll('[data-nr]').forEach(b => b.onclick = () => nudge('r', parseFloat(b.dataset.nr)));
+  $('edLNow').onclick = () => boundaryNow('l'); $('edRNow').onclick = () => boundaryNow('r');
+  $('edLPlay').onclick = () => playAround('l'); $('edRPlay').onclick = () => playAround('r');
+  $('tlScroll').oninput = e => { const span = ED.w/ED.pps; ED.view = (e.target.value/1000)*Math.max(0, S.dur-span); edDirty = true; };
+  $('tlScroll').onchange = () => $('tlScroll').blur();
+
+  // mouse on the timeline: click = seek, drag a boundary = move it, wheel = scroll, ctrl+wheel = zoom
+  const hitB = x => { for(let i=1;i<S.starts.length;i++){ if(Math.abs(xOf(S.starts[i]) - x) <= 6) return i; } return -1; };
+  tl.addEventListener('mousedown', e => {
+    const r = tl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; if(!edOn()) return;
+    const b = y > 18 ? hitB(x) : -1;
+    if(b > 0){ ED.drag = {i:b, sn:snap(), moved:false}; seekTo(S.starts[b]); }
+    else { ED.scrub = true; seekTo(tOf(x)); }
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    const r = tl.getBoundingClientRect(), x = e.clientX - r.left;
+    if(ED.drag){ ED.drag.moved = true; moveBoundary(ED.drag.i, tOf(x)); au.currentTime = S.starts[ED.drag.i]; lastShown = -1; edDirty = true; }
+    else if(ED.scrub){ seekTo(tOf(x)); }
+    else if(e.target === tl){ tl.style.cursor = (e.clientY - r.top > 18 && hitB(x) > 0) ? 'ew-resize' : 'pointer'; }
+  });
+  window.addEventListener('mouseup', () => {
+    if(ED.drag){ if(ED.drag.moved){ pushUndo(ED.drag.sn); afterEdit(); } ED.drag = null; }
+    ED.scrub = false;
+  });
+  tl.addEventListener('wheel', e => {
+    e.preventDefault(); const r = tl.getBoundingClientRect(), x = e.clientX - r.left;
+    if(e.ctrlKey || e.metaKey) setZoom(ED.pps * (e.deltaY < 0 ? 1.25 : 0.8), tOf(x));
+    else { ED.view += (e.deltaX || e.deltaY) / ED.pps * 1.2; clampView(); edDirty = true; }
+  }, {passive:false});
+  new ResizeObserver(() => { if(edOn()) { sizeTl(); } }).observe($('tlwrap'));
+
+  function syncEditor(){
+    const on = edOn(); $('editor').style.display = on ? 'block' : 'none';
+    if(on){ sizeTl(); ensurePeaks(); if(!ED.inited || ED.forS !== S){ ED.forS = S; ED.inited = true; ED.undo = []; ED.redo = []; ED.pps = Math.max(ED.w/Math.max(1,S.dur), 40); ED.view = 0; } edDirty = true; edInfo(); drawTl(); }
+  }
+  // follow the playhead while playing; redraw when needed (called every animation frame)
+  function edTick(){
+    if(!edOn()) return;
+    const t = nowT(), x = xOf(t);
+    if(!au.paused && !ED.scrub && !ED.drag && (x > ED.w*0.9 || x < 0)){ ED.view = t - (ED.w/ED.pps)*0.1; clampView(); edDirty = true; }
+    if(edDirty || !au.paused){ drawTl(); edInfo(); }
+  }
+
   /* ---------- volume ---------- */
   let vol = 100, muted = false;
   try{ const v = parseInt(localStorage.getItem('autocut.vol'),10); if(v>=0 && v<=100) vol = v; }catch(e){}
@@ -1208,11 +1432,14 @@ const AutoAlign = (function(){
     if(tag==='textarea' || (tag==='input' && e.target.type==='text')) return;
     if($('resume').classList.contains('on')) return;
     if($('modal').classList.contains('on')){ if(e.key==='Escape') $('modal').classList.remove('on'); return; }
+    if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code==='KeyZ' && edOn()){ e.preventDefault(); undo(); return; }
+    if((e.ctrlKey || e.metaKey) && (e.code==='KeyY' || (e.shiftKey && e.code==='KeyZ')) && edOn()){ e.preventDefault(); redo(); return; }
+    if(e.altKey && edOn() && (e.code==='ArrowLeft' || e.code==='ArrowRight')){ e.preventDefault(); nudge('l', e.code==='ArrowLeft' ? -0.1 : 0.1); return; }
     const act = actionOf(e.code); if(!act) return;
     e.preventDefault();
-    if(act==='next'){ if(S.mode==='rec') next(); }
-    else if(act==='back') back();
-    else if(act==='pause') togglePause();
+    if(act==='next'){ if(S.mode==='rec') next(); else if(edOn()) gotoFrame(curI()+1); }
+    else if(act==='back'){ if(S.mode==='rec') back(); else if(edOn()) gotoFrame(curI()-1 - (nowT() - S.starts[curI()] > 0.5 ? -1 : 0)); }
+    else if(act==='pause'){ if(S.mode==='done' && edOn()){ seekTo(nowT()); ED.playTok++; au.play(); $('bPause').textContent = pauseTxt(0); } else togglePause(); }
     else if(act==='volUp'){ setVol(vol+10); toast('Громкость '+vol+'%'); }
     else if(act==='volDown'){ setVol(vol-10); toast('Громкость '+vol+'%'); }
     else if(act==='mute'){ muted = !muted; if(!muted && vol===0) vol = 50; applyVol(false); toast(muted ? 'Звук выключен' : 'Громкость '+vol+'%'); }
