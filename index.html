@@ -121,7 +121,7 @@
   .fxbox .row span{flex:1;color:var(--dim);font-size:13px}
   .fxbox select{max-width:150px}
   #fxopts{display:grid;gap:9px}
-  #fxopts.off{opacity:.45;pointer-events:none}
+  #fxopts.off,#tropts.off,#sbopts.off,#muopts.off{opacity:.45;pointer-events:none}
   .fxkinds{display:grid;gap:6px}
   .fxk{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:6px 9px;font-size:13px;cursor:pointer;user-select:none}
   .fxk.on{border-color:var(--accent);background:var(--tint)}
@@ -262,6 +262,50 @@
     </div>
 
     <div class="sec">
+      <h4>Переходы</h4>
+      <div class="fxbox">
+        <label class="chk"><input type="checkbox" id="trOn"> Плавное растворение между картинками</label>
+        <div id="tropts" class="off">
+          <div class="row"><span>Между какими</span>
+            <select id="trEvery"><option value="1">Между всеми</option><option value="2">Через одну</option><option value="3">Каждая 3-я</option><option value="5">Каждая 5-я</option><option value="10">Каждая 10-я</option></select></div>
+          <div class="row"><span>Длина</span>
+            <select id="trDur"><option value="0.2">Короткая 0.2 с</option><option value="0.4">Средняя 0.4 с</option><option value="0.7">Длинная 0.7 с</option></select></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="trIn"> Проявление из чёрного в начале</label>
+        <label class="chk"><input type="checkbox" id="trOut"> Затухание в чёрное в конце</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h4>Субтитры</h4>
+      <div class="fxbox">
+        <label class="chk"><input type="checkbox" id="sbBurn"> Вшить в видео</label>
+        <div id="sbopts" class="off">
+          <label class="chk"><input type="checkbox" id="sbHl"> Подсвечивать читаемое слово</label>
+          <div class="row" style="margin-top:8px"><span>Размер</span>
+            <select id="sbSize"><option value="44">Мелкие</option><option value="56">Средние</option><option value="70">Крупные</option></select></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="sbSrt"> Сохранить файл .srt для YouTube</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h4>Фоновая музыка</h4>
+      <div class="fxbox">
+        <div class="row"><button class="btn" id="muPick" style="flex:1">Выбрать трек…</button><button class="btn" id="muDel" style="display:none" title="Убрать трек">✕</button></div>
+        <input type="file" id="fMus" accept="audio/*" style="display:none">
+        <div class="hint" id="muName" style="margin:0">Трек не выбран</div>
+        <div id="muopts" class="off">
+          <div class="row"><span>Громкость</span><input type="range" id="muVol" min="2" max="100" value="20" style="flex:1"></div>
+          <div class="row"><span>Приглушать под голос</span>
+            <select id="muDuck"><option value="0">Нет</option><option value="1">Заметно</option><option value="2">Сильно</option></select></div>
+          <div class="row"><span>Затихание в конце</span>
+            <select id="muFade"><option value="0">Нет</option><option value="2">2 с</option><option value="4">4 с</option><option value="6">6 с</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
       <h4>Настройки</h4>
       <div class="row" style="margin-bottom:8px">
         <span style="color:var(--dim);font-size:13.5px;flex:1">Скорость звука</span>
@@ -364,6 +408,7 @@
     <button class="btn" id="eConcat">concat.txt — список для ffmpeg</button>
     <button class="btn primary" id="eBat">render.bat — собрать видео (нужен ffmpeg)</button>
     <button class="btn primary" id="eRender" style="display:none">Собрать видео mp4 прямо здесь</button>
+    <button class="btn" id="eTrial" style="display:none;margin-top:6px" title="Соберёт 20 секунд с того места, где сейчас стоит воспроизведение">Пробная сборка: 20 секунд с текущего места</button>
     <div id="rwrap" style="display:none;margin:4px 0 10px"><div class="prog"><div id="rbar"></div></div><div class="hint" id="rtxt">Собираю…</div>
       <button class="btn" id="rCancel" style="margin-top:8px;width:auto">Отмена</button></div>
     <button class="btn" id="eClose">Закрыть</button>
@@ -375,7 +420,10 @@
 (function(){
   const $ = id => document.getElementById(id);
   const FXD = () => ({on:false, every:'1', kinds:['lr','rl','in','out'], order:'cycle', power:'mid'});
-  const newState = () => ({fx:FXD(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const TRD = () => ({on:false, every:'1', dur:'0.4', fin:false, fout:false});
+  const SBD = () => ({burn:false, srt:false, hl:true, size:'56'});
+  const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
+  const newState = () => ({fx:FXD(), tr:TRD(), sb:SBD(), mu:MUD(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -454,6 +502,74 @@
   $('fxOrder').onchange = e => { S.fx.order = e.target.value; touch(); };
   $('fxPower').onchange = e => { S.fx.power = e.target.value; touch(); };
 
+  /* ---------- transitions, subtitles, music ---------- */
+  function renderPost(){
+    const t = S.tr, b = S.sb, m = S.mu;
+    $('trOn').checked = !!t.on; $('tropts').classList.toggle('off', !t.on); $('trEvery').value = t.every; $('trDur').value = t.dur;
+    $('trIn').checked = !!t.fin; $('trOut').checked = !!t.fout;
+    $('sbBurn').checked = !!b.burn; $('sbopts').classList.toggle('off', !b.burn); $('sbHl').checked = !!b.hl; $('sbSize').value = b.size; $('sbSrt').checked = !!b.srt;
+    $('muName').textContent = m.name || 'Трек не выбран'; $('muDel').style.display = m.path ? '' : 'none';
+    $('muopts').classList.toggle('off', !m.path); $('muVol').value = m.vol; $('muDuck').value = m.duck; $('muFade').value = m.fade;
+  }
+  const bind = (id, fn) => { $(id).onchange = e => { fn(e.target); touch(); }; };
+  bind('trOn', e => { S.tr.on = e.checked; renderPost(); });
+  bind('trEvery', e => S.tr.every = e.value); bind('trDur', e => S.tr.dur = e.value);
+  bind('trIn', e => S.tr.fin = e.checked); bind('trOut', e => S.tr.fout = e.checked);
+  bind('sbBurn', e => { S.sb.burn = e.checked; renderPost(); }); bind('sbHl', e => S.sb.hl = e.checked);
+  bind('sbSize', e => S.sb.size = e.value); bind('sbSrt', e => S.sb.srt = e.checked);
+  bind('muVol', e => S.mu.vol = +e.value); bind('muDuck', e => S.mu.duck = e.value); bind('muFade', e => S.mu.fade = e.value);
+  $('muPick').onclick = () => { if(!NATIVE){ toast('Музыка добавляется только в программе AutoCut для Windows'); return; } $('fMus').click(); };
+  $('fMus').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+    const p = NATIVE ? NATIVE.pathFor(f) : ''; if(!p){ toast('Не удалось получить путь к файлу'); return; }
+    S.mu.path = p; S.mu.name = f.name; renderPost(); touch(); };
+  $('muDel').onclick = () => { S.mu.path = ''; S.mu.name = ''; renderPost(); touch(); };
+  function trFor(i){ const t = S.tr; if(!t.on || i<1) return 0; const e = Math.max(1, parseInt(t.every,10)||1); return i % e === 0 ? (parseFloat(t.dur)||0.4) : 0; }
+
+  // caption pictures: one strip per highlighted word
+  function capStates(i, dur){
+    const text = S.lines[i] || ''; const ws = wordsOf(text); if(!ws.length) return null;
+    const size = parseInt(S.sb.size,10) || 56, Wd = 1920, Hs = Math.round(size*3.6 + 80);
+    const c = document.createElement('canvas'); c.width = Wd; c.height = Hs; const g = c.getContext('2d');
+    g.font = '700 '+size+'px "Segoe UI", Arial, sans-serif'; g.textBaseline = 'alphabetic';
+    const sp = g.measureText(' ').width, maxW = 1560, lines = []; let cur = [], cw = 0;
+    ws.forEach((w,k) => { const m = g.measureText(w).width; if(cur.length && cw + sp + m > maxW){ lines.push(cur); cur = []; cw = 0; } cur.push({w,k,m}); cw += (cur.length>1?sp:0) + m; });
+    if(cur.length) lines.push(cur);
+    const lh = size*1.25, y0 = Hs - 66 - (lines.length-1)*lh;
+    const pos = [];
+    lines.forEach((ln,r) => { const tw = ln.reduce((a,x)=>a+x.m,0) + sp*(ln.length-1); let x = (Wd-tw)/2; ln.forEach(o => { pos[o.k] = {x, y:y0+r*lh, m:o.m, w:o.w}; x += o.m + sp; }); });
+    const draw = hl => {
+      g.clearRect(0,0,Wd,Hs); g.lineJoin = 'round';
+      pos.forEach((p,k) => {
+        if(hl===k){ g.fillStyle = 'rgba(230,57,70,.55)'; const r = 10, x = p.x-10, y = p.y-size*0.95, w = p.m+20, h = size*1.25;
+          g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.fill(); }
+        g.lineWidth = size*0.16; g.strokeStyle = 'rgba(0,0,0,.92)'; g.strokeText(p.w, p.x, p.y);
+        g.fillStyle = hl===k ? '#ff8a93' : (hl>k ? '#f2d680' : '#ffffff'); g.fillText(p.w, p.x, p.y);
+      });
+      return c.toDataURL('image/png').split(',')[1];
+    };
+    if(!S.sb.hl) return {strip:Hs, subs:[{png:draw(-1), d:dur}]};
+    const wt = W[i] && W[i].length === ws.length ? W[i] : ws.map(wWeight), sum = wt.reduce((a,b)=>a+b,0);
+    return {strip:Hs, subs: ws.map((_,k) => ({png:draw(k), d:dur*wt[k]/sum}))};
+  }
+  function blankStrip(h){ const c = document.createElement('canvas'); c.width = 1920; c.height = h; return c.toDataURL('image/png').split(',')[1]; }
+  function buildFrames(range){
+    const d = durations(); computeWeights();
+    const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i], fx:fxFor(i), zoom:fxZoom(), tr:trFor(i), text:S.lines[i]||''}));
+    const opts = {srt:!!S.sb.srt && !range, burn:!!S.sb.burn, fadeIn:S.tr.fin?0.8:0, fadeOut:S.tr.fout?1.2:0};
+    if(S.mu.path) opts.music = {path:S.mu.path, vol:(S.mu.vol||20)/100, duck:+S.mu.duck, fade:+S.mu.fade};
+    if(S.sb.burn){
+      let strip = 0;
+      frames.forEach((f,i) => {
+        if(range && (range.t0 > S.starts[i]+d[i] || range.t1 < S.starts[i])) return;
+        const r = capStates(i, d[i]); if(r){ f.subs = r.subs; strip = r.strip; }
+      });
+      opts.blankPng = blankStrip(strip || 200);
+    }
+    if(range) opts.range = range;
+    frames[0].opts = opts;
+    return frames;
+  }
+
   /* ---------- channels, projects (tabs) and autosave ---------- */
   let DB = null, VIEW = 'work', activeId = null;
   function load(){
@@ -485,7 +601,7 @@
   function serialize(st){
     return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx};
+            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, sb:st.sb, mu:st.mu};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -507,7 +623,7 @@
     const st = newState(); states[id] = st;
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d) return st;
-    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {});
+    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {});
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
@@ -568,7 +684,7 @@
     $('modal').classList.remove('on');
     $('bPause').textContent = S.mode==='rec' ? pauseTxt(1) : pauseTxt(0);
     lastShown = -1; computeWeights();
-    renderFiles(); renderFx(); refresh(); setMode(S.mode, S.label);
+    renderFiles(); renderFx(); renderPost(); refresh(); setMode(S.mode, S.label);
     showFrame(S.mode==='rec' ? S.idx : 0, S.mode==='idle');
   }
   function leave(){
@@ -988,19 +1104,22 @@
     $('eBat').style.display = 'none'; $('eConcat').style.display = 'none';
     $('hintWeb').textContent = 'Нажмите «Собрать видео», выберите, куда сохранить. ffmpeg уже встроен в программу.';
     NATIVE.onProgress(v => { $('rbar').style.width = (v*100)+'%'; $('rtxt').textContent = 'Собираю видео… '+Math.round(v*100)+'%'; });
-    $('eRender').onclick = async () => {
-      const d = durations();
-      const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i], fx:fxFor(i), zoom:fxZoom()}));
+    const doRender = async range => {
+      let frames;
+      try{ frames = buildFrames(range); }catch(err){ $('rwrap').style.display = 'block'; $('rtxt').textContent = 'Ошибка подготовки: '+err.message; return; }
       $('rwrap').style.display = 'block';
       if(!S.audioPath || frames.some(f=>!f.path)){ $('rtxt').textContent = 'Не удалось получить пути к файлам. Выберите файлы заново через кнопки слева.'; return; }
       $('rbar').style.width='0'; $('rtxt').textContent = 'Собираю видео… 0%';
-      $('eRender').disabled = true;
+      $('eRender').disabled = true; $('eTrial').disabled = true;
       const r = await NATIVE.render({frames, audioPath:S.audioPath});
-      $('eRender').disabled = false;
-      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out; NATIVE.showItem(r.out); S.rendered = true; if(activeId) saveProject(activeId); }
+      $('eRender').disabled = false; $('eTrial').disabled = false;
+      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out; NATIVE.showItem(r.out); if(!range){ S.rendered = true; if(activeId) saveProject(activeId); } }
       else if(r.cancelled){ $('rwrap').style.display='none'; }
       else { $('rtxt').textContent = r.error==='cancelled' ? 'Отменено' : 'Ошибка: '+r.error; }
     };
+    $('eRender').onclick = () => doRender(null);
+    $('eTrial').style.display = 'block';
+    $('eTrial').onclick = () => { const t0 = Math.max(0, Math.min(S.dur-1, au.currentTime || 0)); doRender({t0, t1:Math.min(S.dur, t0+20)}); };
     $('rCancel').onclick = () => NATIVE.cancel();
   }
 

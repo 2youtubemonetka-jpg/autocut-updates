@@ -1,7 +1,7 @@
 {
- "version": "1.8.0",
+ "version": "1.9.0",
  "files": {
-  "index.html": "4dcdd33149539ad34af34d2c5989696704d0ce394e3844886b2297017f4e2f07",
-  "render.js": "e86fd57aefd38ab78d40c025b7c295cc9c1a7dad98ce452122476702bae44829"
+  "index.html": "78614aada7c591e988b961e7c02c39ebe0d3d7009dc1a4a7e967543a862b8ba9",
+  "render.js": "92a2b9de82b96fe368acaf6a5d250d98e9bd6e830b4ef06d25553609c784d4f0"
  }
 }
