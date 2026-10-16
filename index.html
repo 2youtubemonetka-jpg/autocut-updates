@@ -136,6 +136,12 @@
   .vol button{background:none;border:1px solid var(--line);border-radius:8px;padding:2px 8px;font-size:12px;color:var(--dim)}
   .vol button:hover{border-color:var(--accent2);color:var(--text)}
   .ctrl .time{margin-left:14px}
+  .keys button.kb{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 8px;color:var(--text);font:12px ui-monospace,Consolas,monospace;white-space:nowrap;min-width:46px;cursor:pointer;justify-self:start}
+  .keys button.kb:hover{border-color:var(--accent2)}
+  .keys button.kb.wait{border-color:var(--accent);background:var(--tint);color:var(--accent2);animation:blink 1s infinite}
+  .keys button.kb.none{color:var(--dim);border-style:dashed}
+  @keyframes blink{50%{opacity:.55}}
+  .keyreset{grid-column:1/-1;background:none;border:0;color:var(--dim);font-size:12px;text-align:left;padding:0;text-decoration:underline;cursor:pointer;margin-top:2px}
   /* nav + toast */
   .themes{display:flex;gap:5px;margin-left:8px}
   .themes button{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);padding:0}
@@ -248,14 +254,7 @@
 
     <button class="big" id="start" disabled>Начать запись</button>
 
-    <div class="keys">
-      <kbd>Пробел</kbd><span>следующая картинка</span>
-      <kbd>←</kbd><span>назад на 1 кадр</span>
-      <kbd>P</kbd><span>пауза / продолжить</span>
-      <kbd>↑ ↓</kbd><span>громче / тише</span>
-      <kbd>M</kbd><span>без звука</span>
-      <kbd>F</kbd><span>на весь экран</span>
-    </div>
+    <div class="keys" id="keys"></div>
   </aside>
 
   <main class="main" id="work">
@@ -275,8 +274,8 @@
     <div class="prog"><div id="bar"></div></div>
     <div class="ctrl">
       <button class="btn" id="bBack" disabled>← Назад</button>
-      <button class="btn primary" id="bNext" disabled>Следующая (Пробел)</button>
-      <button class="btn" id="bPause" disabled>Пауза (P)</button>
+      <button class="btn primary" id="bNext" disabled>Следующая</button>
+      <button class="btn" id="bPause" disabled>Пауза</button>
       <button class="btn" id="bReview" disabled>Просмотр результата</button>
       <button class="btn" id="bExport" disabled>Экспорт</button>
       <span class="vol"><button id="mute" title="Выключить звук (M)">Звук</button><input type="range" id="vol" min="0" max="100" step="1" value="100" title="Громкость (стрелки вверх и вниз)"><b id="volv">100%</b></span>
@@ -522,7 +521,7 @@
     if(S.mode==='review'){ S.mode = S.starts.length>1 ? 'done' : 'idle'; S.label = S.mode==='done' ? 'Запись завершена' : 'Добавьте файлы слева'; }
     if(S.mode==='rec'){ S.resumePos = S.pos || (S.starts[S.idx]||0); S.label = 'Запись приостановлена · нажмите «Продолжить»'; }
     $('modal').classList.remove('on');
-    $('bPause').textContent = S.mode==='rec' ? 'Продолжить (P)' : 'Пауза (P)';
+    $('bPause').textContent = S.mode==='rec' ? pauseTxt(1) : pauseTxt(0);
     lastShown = -1; computeWeights();
     renderFiles(); renderFx(); refresh(); setMode(S.mode, S.label);
     showFrame(S.mode==='rec' ? S.idx : 0, S.mode==='idle');
@@ -646,7 +645,7 @@
     updNav();
   }
   function setView(v){
-    if(v==='lib' && S.mode==='rec' && !au.paused){ au.pause(); S.pos = au.currentTime; $('bPause').textContent = 'Продолжить (P)'; }
+    if(v==='lib' && S.mode==='rec' && !au.paused){ au.pause(); S.pos = au.currentTime; $('bPause').textContent = pauseTxt(1); }
     VIEW = v;
     $('work').style.display = v==='work' ? 'flex' : 'none';
     $('lib').style.display = v==='lib' ? 'flex' : 'none';
@@ -837,12 +836,12 @@
     if(!S.imgs.length || !S.dur) return;
     au.pause(); au.currentTime = 0; au.playbackRate = parseFloat($('rate').value);
     S.starts = [0]; S.idx = 0; S.rendered = false; S.pos = 0; computeWeights();
-    setMode('rec','Идёт запись · слушайте и жмите Пробел, когда фраза кадра закончилась');
+    setMode('rec',recLbl());
     showFrame(0); au.play();
   }
   function next(){
     if(S.mode!=='rec') return;
-    if(au.paused){ au.play(); $('bPause').textContent = 'Пауза (P)'; $('modeLbl').textContent = 'Идёт запись · слушайте и жмите Пробел, когда фраза кадра закончилась'; return; }
+    if(au.paused){ au.play(); $('bPause').textContent = pauseTxt(0); $('modeLbl').textContent = recLbl(); return; }
     if(S.idx >= S.imgs.length-1){ finish(); return; }
     S.idx++; S.starts[S.idx] = au.currentTime;
     showFrame(S.idx); touch();
@@ -861,7 +860,7 @@
     $('modal').classList.add('on');
   }
   function togglePause(){
-    if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? 'Продолжить (P)' : 'Пауза (P)'; if(S.mode==='rec'){ S.pos = au.currentTime; touch(); } if(curAnim){ au.paused ? curAnim.pause() : curAnim.play(); } }
+    if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? pauseTxt(1) : pauseTxt(0); if(S.mode==='rec'){ S.pos = au.currentTime; touch(); } if(curAnim){ au.paused ? curAnim.pause() : curAnim.play(); } }
   }
   au.addEventListener('ended', () => { if(S.mode==='rec' && au.currentTime > 0) S.dur = Math.max(S.dur, au.currentTime); if(S.mode==='rec') finish(); else if(S.mode==='review'){ clearFx(); setMode('done','Просмотр завершён'); } });
 
@@ -870,7 +869,7 @@
     if(!S.starts.length) return;
     au.pause(); au.currentTime = 0; au.playbackRate = 1;
     lastShown = -1; setMode('review','Просмотр результата'); au.play();
-    $('bPause').textContent = 'Пауза (P)';
+    $('bPause').textContent = pauseTxt(0);
   }
   function frameAt(t){
     let lo=0, hi=S.starts.length-1, r=0;
@@ -958,6 +957,58 @@
     $('rCancel').onclick = () => NATIVE.cancel();
   }
 
+  /* ---------- rebindable keys ---------- */
+  const ACTIONS = [['next','следующая картинка','Space'],['back','назад на 1 кадр','ArrowLeft'],['pause','пауза / продолжить','KeyP'],
+                   ['volUp','громче','ArrowUp'],['volDown','тише','ArrowDown'],['mute','без звука','KeyM'],['full','на весь экран','KeyF']];
+  let KEYS = {};
+  function defKeys(){ const k = {}; ACTIONS.forEach(a => k[a[0]] = a[2]); return k; }
+  try{ KEYS = Object.assign(defKeys(), JSON.parse(localStorage.getItem('autocut.keys')||'{}')); }catch(e){ KEYS = defKeys(); }
+  function saveKeys(){ try{ localStorage.setItem('autocut.keys', JSON.stringify(KEYS)); }catch(e){} }
+  const NAMES = {Space:'Пробел', ArrowLeft:'←', ArrowRight:'→', ArrowUp:'↑', ArrowDown:'↓', Backspace:'Backspace', Enter:'Enter', Tab:'Tab', Delete:'Delete',
+                 Home:'Home', End:'End', PageUp:'PageUp', PageDown:'PageDown', Insert:'Insert', Backquote:'`', Minus:'-', Equal:'=', BracketLeft:'[', BracketRight:']',
+                 Semicolon:';', Quote:"'", Comma:',', Period:'.', Slash:'/', Backslash:'\\'};
+  function codeName(c){
+    if(!c) return 'нет';
+    if(NAMES[c]) return NAMES[c];
+    let m = c.match(/^Key([A-Z])$/); if(m) return m[1];
+    m = c.match(/^Digit(\d)$/); if(m) return m[1];
+    m = c.match(/^Numpad(\w+)$/); if(m) return 'Num '+m[1].replace('Add','+').replace('Subtract','-').replace('Multiply','*').replace('Divide','/').replace('Decimal','.');
+    return c;
+  }
+  const keyLabel = a => codeName(KEYS[a]);
+  const actionOf = code => { for(const a of ACTIONS) if(KEYS[a[0]]===code) return a[0]; return null; };
+  const pauseTxt = p => (p ? 'Продолжить' : 'Пауза')+' ('+keyLabel('pause')+')';
+  const recLbl = () => 'Идёт запись · слушайте и жмите '+keyLabel('next')+', когда фраза кадра закончилась';
+  let capturing = null;
+  function renderKeys(){
+    const box = $('keys'); box.innerHTML = '';
+    ACTIONS.forEach(([id,label]) => {
+      const b = document.createElement('button'); b.className = 'kb'+(capturing===id?' wait':'')+(!KEYS[id]?' none':'');
+      b.textContent = capturing===id ? 'нажмите клавишу' : codeName(KEYS[id]);
+      b.title = 'Нажмите, затем новую клавишу (Esc: отмена, Delete: убрать)';
+      b.onclick = () => { capturing = capturing===id ? null : id; renderKeys(); };
+      const sp = document.createElement('span'); sp.textContent = label;
+      box.append(b, sp);
+    });
+    const r = document.createElement('button'); r.className = 'keyreset'; r.textContent = 'Вернуть клавиши по умолчанию';
+    r.onclick = () => { KEYS = defKeys(); capturing = null; saveKeys(); renderKeys(); toast('Клавиши сброшены'); };
+    box.appendChild(r);
+    const mode = S.mode; const rec = mode==='rec' || mode==='review';
+    $('bNext').textContent = 'Следующая ('+keyLabel('next')+')';
+    $('bBack').textContent = '← Назад ('+keyLabel('back')+')';
+    $('bPause').textContent = pauseTxt(rec && au.paused);
+  }
+  function captureKey(e){
+    if(['ShiftLeft','ShiftRight','ControlLeft','ControlRight','AltLeft','AltRight','MetaLeft','MetaRight','CapsLock'].includes(e.code)) return;
+    const id = capturing; capturing = null;
+    if(e.code==='Escape'){ renderKeys(); return; }
+    if(e.code==='Delete'){ KEYS[id] = ''; saveKeys(); renderKeys(); return; }
+    let swapped = '';
+    for(const a of ACTIONS){ if(a[0]!==id && KEYS[a[0]]===e.code){ KEYS[a[0]] = ''; swapped = a[1]; } }
+    KEYS[id] = e.code; saveKeys(); renderKeys();
+    toast(codeName(e.code)+': '+ACTIONS.find(a => a[0]===id)[1] + (swapped ? '. Клавиша снята с действия «'+swapped+'»' : ''));
+  }
+
   /* ---------- volume ---------- */
   let vol = 100, muted = false;
   try{ const v = parseInt(localStorage.getItem('autocut.vol'),10); if(v>=0 && v<=100) vol = v; }catch(e){}
@@ -982,25 +1033,29 @@
   $('rate').onchange = () => { if(S.mode==='rec') au.playbackRate = parseFloat($('rate').value); };
 
   document.addEventListener('keydown', e => {
+    if(capturing){ e.preventDefault(); e.stopPropagation(); captureKey(e); return; }
     const tag = (e.target.tagName||'').toLowerCase();
-    if(VIEW==='lib' && !(e.code==='KeyF')) return;
+    if(VIEW==='lib' && actionOf(e.code)!=='full') return;
     if(tag==='select' && e.code==='Space') return;
     if(tag==='textarea' || (tag==='input' && e.target.type==='text')) return;
     if($('resume').classList.contains('on')) return;
     if($('modal').classList.contains('on')){ if(e.key==='Escape') $('modal').classList.remove('on'); return; }
-    if(e.code==='Space'){ e.preventDefault(); if(S.mode==='rec') next(); }
-    else if(e.code==='ArrowLeft' || e.code==='Backspace'){ e.preventDefault(); back(); }
-    else if(e.code==='KeyP' || e.code==='KeyK'){ e.preventDefault(); togglePause(); }
-    else if(e.code==='ArrowUp'){ e.preventDefault(); setVol(vol+10); toast('Громкость '+vol+'%'); }
-    else if(e.code==='ArrowDown'){ e.preventDefault(); setVol(vol-10); toast('Громкость '+vol+'%'); }
-    else if(e.code==='KeyM'){ e.preventDefault(); muted = !muted; if(!muted && vol===0) vol = 50; applyVol(false); toast(muted ? 'Звук выключен' : 'Громкость '+vol+'%'); }
-    else if(e.code==='KeyF'){ e.preventDefault(); if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+    const act = actionOf(e.code); if(!act) return;
+    e.preventDefault();
+    if(act==='next'){ if(S.mode==='rec') next(); }
+    else if(act==='back') back();
+    else if(act==='pause') togglePause();
+    else if(act==='volUp'){ setVol(vol+10); toast('Громкость '+vol+'%'); }
+    else if(act==='volDown'){ setVol(vol-10); toast('Громкость '+vol+'%'); }
+    else if(act==='mute'){ muted = !muted; if(!muted && vol===0) vol = 50; applyVol(false); toast(muted ? 'Звук выключен' : 'Громкость '+vol+'%'); }
+    else if(act==='full'){ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
   });
   // do not let buttons keep focus, otherwise Space would "click" them
   document.addEventListener('click', e => { if(e.target.closest('button') && !e.target.closest('.modal')) e.target.closest('button').blur(); });
 
   Object.defineProperty(window,'__autocut',{get:()=>S}); // for debugging
   if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; try{ const last = localStorage.getItem('autocut.lastver'); if(last && last!==i.version) setTimeout(() => toast('Программа обновлена до v'+i.version), 600); localStorage.setItem('autocut.lastver', i.version); }catch(e){} }).catch(()=>{});
+  renderKeys();
   load(); renderChannels();
   { const c = curCh(); const t = curTab(); c.tab = t.id; activeId = t.id; S = hydrate(t.id); renderTabs(); applyState(); }
   // returning to an unfinished recording: offer to continue, postpone or delete
