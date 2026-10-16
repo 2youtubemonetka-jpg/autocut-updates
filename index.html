@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCut</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --text:#eef0f4; --dim:#8a92a3; --accent:#e63946; --accent2:#ffb703; --ok:#2ec27e; --warn:#f5a524;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;overflow:hidden}
+  button{font:inherit;color:inherit;cursor:pointer}
+  .app{display:grid;grid-template-columns:320px 1fr;height:100vh}
+
+  /* sidebar */
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:20px 18px;display:flex;flex-direction:column;gap:18px;overflow:auto}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:.2px}
+  .brand i{width:26px;height:26px;border-radius:8px;background:var(--accent);display:grid;place-items:center;font-style:normal;font-size:14px}
+  .sec h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);font-weight:600}
+  .cat{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--accent);background:rgba(230,57,70,.12);border-radius:10px;font-weight:600}
+  .cat small{display:block;color:var(--dim);font-weight:400}
+  .drop{display:block;border:1px dashed var(--line);border-radius:12px;padding:12px 14px;background:var(--panel2);cursor:pointer;transition:.15s}
+  .drop:hover{border-color:var(--accent2)}
+  .drop.ok{border-style:solid;border-color:rgba(46,194,126,.6)}
+  .drop b{display:block;font-size:14px}
+  .drop span{display:block;font-size:12.5px;color:var(--dim);margin-top:2px;word-break:break-all}
+  .drop.ok span{color:var(--ok)}
+  input[type=file]{display:none}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center}
+  .stat b{display:block;font-size:17px}
+  .stat small{color:var(--dim);font-size:11px}
+  .stat.bad b{color:var(--warn)}
+  .msg{font-size:12.5px;color:var(--warn);min-height:18px}
+  .row{display:flex;gap:8px;align-items:center}
+  select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit}
+  label.chk{display:flex;gap:8px;align-items:center;color:var(--dim);font-size:13.5px}
+  .big{width:100%;padding:13px;border:0;border-radius:12px;background:var(--accent);font-weight:700;font-size:16px;transition:.15s}
+  .big:hover{filter:brightness(1.1)}
+  .big:disabled{background:var(--panel2);color:var(--dim);cursor:not-allowed;filter:none}
+  .keys{margin-top:auto;font-size:12.5px;color:var(--dim);display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+  kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--text);font:12px ui-monospace,Consolas,monospace;white-space:nowrap}
+
+  /* main */
+  .main{display:flex;flex-direction:column;min-width:0;height:100vh;padding:18px 24px 16px;gap:12px}
+  .topbar{display:flex;align-items:center;gap:14px;color:var(--dim);font-size:13.5px}
+  .topbar .pill{background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:3px 12px;color:var(--text)}
+  .topbar .grow{flex:1}
+  .textcur{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:16px 22px;font-size:clamp(20px,2.4vw,32px);font-weight:600;line-height:1.3;min-height:84px;display:flex;align-items:center}
+  .stage{flex:1;min-height:0;display:grid;place-items:center;background:#0a0b0e;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;position:relative}
+  .stage img{max-width:100%;max-height:100%;display:block}
+  .stage .empty{color:var(--dim);text-align:center;padding:20px}
+  .stage .empty b{display:block;font-size:20px;color:var(--text);margin-bottom:6px}
+  .badge{position:absolute;left:12px;top:12px;background:rgba(15,17,21,.85);border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-size:13px}
+  .textnext{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 22px;font-size:clamp(15px,1.5vw,20px);color:var(--dim);min-height:56px;display:flex;gap:12px;align-items:center}
+  .textnext em{font-style:normal;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent2);flex:none}
+  .prog{height:8px;background:var(--panel2);border-radius:99px;position:relative;overflow:hidden;border:1px solid var(--line)}
+  .prog>div{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0}
+  .ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 16px;transition:.15s}
+  .btn:hover{border-color:var(--accent2)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);font-weight:700}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .time{margin-left:auto;font:600 15px ui-monospace,Consolas,monospace;color:var(--dim)}
+
+
+  /* channel box */
+  .chbox{border:1px solid var(--accent);background:rgba(230,57,70,.10);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+  .chbox .row{gap:6px}
+  .chbox select{flex:1;min-width:0}
+  .mini{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:16px;line-height:1;display:grid;place-items:center;padding:0}
+  .mini:hover{border-color:var(--accent2)}
+  .chbox input{width:100%;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--text);font:inherit;padding:4px 6px;margin:0 -6px;outline:none}
+  .chbox input:hover{border-color:var(--line)}
+  .chbox input:focus{border-color:var(--accent2);background:rgba(0,0,0,.25)}
+  .chbox input.chname{font-weight:700;font-size:15.5px}
+  .chbox input.chsub{font-size:12.5px;color:var(--dim)}
+  .drop.over{border-color:var(--accent2);background:rgba(255,183,3,.10)}
+  .dropall{position:fixed;inset:0;z-index:50;background:rgba(15,17,21,.82);display:none;place-items:center;pointer-events:none;font-size:26px;font-weight:700;color:var(--accent2);border:3px dashed var(--accent2);margin:10px;border-radius:20px}
+  .dropall.on{display:grid}
+  /* tabs */
+  .tabs{display:flex;gap:6px;align-items:flex-end;border-bottom:1px solid var(--line);margin:-4px 0 0;overflow-x:auto;flex:none}
+  .tab{display:flex;align-items:center;gap:8px;padding:7px 8px 7px 14px;border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;background:var(--panel);color:var(--dim);cursor:pointer;white-space:nowrap;max-width:240px;font-size:13.5px}
+  .tab:hover{color:var(--text)}
+  .tab.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 2px 0 var(--accent)}
+  .tab span.t{overflow:hidden;text-overflow:ellipsis}
+  .tab input{background:var(--bg);border:1px solid var(--accent2);border-radius:6px;color:var(--text);font:inherit;padding:1px 6px;width:140px;outline:none}
+  .tab .x{width:20px;height:20px;border-radius:6px;border:0;background:transparent;color:var(--dim);display:grid;place-items:center;padding:0;font-size:14px}
+  .tab .x:hover{background:rgba(230,57,70,.25);color:#fff}
+  .tabadd{padding:6px 12px;border:1px dashed var(--line);border-bottom:0;border-radius:10px 10px 0 0;background:transparent;color:var(--dim);font-size:13.5px;white-space:nowrap}
+  .tabadd:hover{color:var(--text);border-color:var(--accent2)}
+  /* spoken-word highlight */
+  .w{transition:color .1s,background .1s;border-radius:7px;padding:0 3px;margin:0 -3px}
+  .w.done{color:#f2d680}
+  .w.now{color:#ff5a66;background:rgba(230,57,70,.20);box-shadow:0 0 0 3px rgba(230,57,70,.20)}
+  .textcur.live{border-left-color:#ff5a66}
+
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;place-items:center;z-index:20}
+  .modal.on{display:grid}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;width:min(520px,92vw)}
+  .card h2{margin:0 0 6px}
+  .card p{color:var(--dim);margin:0 0 16px}
+  .card .btn{display:block;width:100%;margin-bottom:8px;text-align:left}
+  .hint{font-size:12.5px;color:var(--dim);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small></div>
+
+    <div class="sec">
+      <h4>Канал / аккаунт</h4>
+      <div class="chbox">
+        <div class="row">
+          <select id="chSel" title="Переключить канал"></select>
+          <button class="mini" id="chAdd" title="Добавить канал">+</button>
+          <button class="mini" id="chDel" title="Удалить канал">&times;</button>
+        </div>
+        <input id="chName" class="chname" placeholder="Название канала" maxlength="60" spellcheck="false">
+        <input id="chSub" class="chsub" placeholder="Описание (необязательно)" maxlength="90" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="sec">
+      <h4>Файлы</h4>
+      <div style="display:grid;gap:8px">
+        <label class="drop" id="dImg"><b>1. Картинки</b><span id="sImg"></span>
+          <input type="file" id="fImg" accept="image/*" multiple></label>
+        <label class="drop" id="dAud"><b>2. Озвучка</b><span id="sAud"></span>
+          <input type="file" id="fAud" accept="audio/*,.mp3,.wav,.m4a,.ogg"></label>
+        <label class="drop" id="dTxt"><b>3. Текст по строкам</b><span id="sTxt"></span>
+          <input type="file" id="fTxt" accept=".txt,text/plain"></label>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat" id="stI"><b>0</b><small>картинок</small></div>
+      <div class="stat" id="stT"><b>0</b><small>строк</small></div>
+      <div class="stat" id="stA"><b>0:00</b><small>звук</small></div>
+    </div>
+    <div class="msg" id="msg"></div>
+
+    <div class="sec">
+      <h4>Настройки</h4>
+      <div class="row" style="margin-bottom:8px">
+        <span style="color:var(--dim);font-size:13.5px;flex:1">Скорость звука</span>
+        <select id="rate"><option value="0.8">0.8×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select>
+      </div>
+      <label class="chk"><input type="checkbox" id="rew" checked> При «Назад» перематывать звук к началу кадра</label>
+    </div>
+
+    <button class="big" id="start" disabled>Начать запись</button>
+
+    <div class="keys">
+      <kbd>Пробел</kbd><span>следующая картинка</span>
+      <kbd>←</kbd><span>назад на 1 кадр</span>
+      <kbd>P</kbd><span>пауза / продолжить</span>
+      <kbd>F</kbd><span>на весь экран</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="tabs" id="tabs"></div>
+    <div class="topbar">
+      <span class="pill" id="frameLbl">Кадр — / —</span>
+      <span id="partLbl"></span>
+      <span class="grow"></span>
+      <span id="modeLbl">Добавьте файлы слева</span>
+    </div>
+    <div class="textcur" id="cur">Текст текущего кадра появится здесь</div>
+    <div class="stage" id="stage">
+      <div class="empty"><b>Готов к работе</b>Перетащите в окно картинки, озвучку и текст, потом нажмите «Начать запись».</div>
+    </div>
+    <div class="textnext"><em>Дальше</em><span id="nxt">—</span></div>
+    <div class="prog"><div id="bar"></div></div>
+    <div class="ctrl">
+      <button class="btn" id="bBack" disabled>← Назад</button>
+      <button class="btn primary" id="bNext" disabled>Следующая (Пробел)</button>
+      <button class="btn" id="bPause" disabled>Пауза (P)</button>
+      <button class="btn" id="bReview" disabled>Просмотр результата</button>
+      <button class="btn" id="bExport" disabled>Экспорт</button>
+      <span class="time" id="time">0:00 / 0:00</span>
+    </div>
+  </main>
+</div>
+
+<div class="dropall" id="dropall">Отпустите файлы: картинки, озвучку или текст</div>
+
+<div class="modal" id="modal">
+  <div class="card">
+    <h2>Запись завершена</h2>
+    <p id="mInfo"></p>
+    <button class="btn" id="eJson">timeline.json — тайминги всех кадров</button>
+    <button class="btn" id="eCsv">timeline.csv — таблица для проверки</button>
+    <button class="btn" id="eConcat">concat.txt — список для ffmpeg</button>
+    <button class="btn primary" id="eBat">render.bat — собрать видео (нужен ffmpeg)</button>
+    <button class="btn primary" id="eRender" style="display:none">Собрать видео mp4 прямо здесь</button>
+    <div id="rwrap" style="display:none;margin:4px 0 10px"><div class="prog"><div id="rbar"></div></div><div class="hint" id="rtxt">Собираю…</div>
+      <button class="btn" id="rCancel" style="margin-top:8px;width:auto">Отмена</button></div>
+    <button class="btn" id="eClose">Закрыть</button>
+    <div class="hint" id="hintWeb">Положите concat.txt, render.bat, все картинки и озвучку в одну папку и запустите render.bat. Готовое видео — output.mp4.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const newState = () => ({imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  let S = newState();
+  const states = {};                       // tabId -> state (files live only in memory)
+  const au = new Audio(); au.preload = 'auto';
+  const NATIVE = window.native || null;
+
+  const fmt = t => { t = Math.max(0, t||0); const m = Math.floor(t/60), s = Math.floor(t%60); return m+':'+String(s).padStart(2,'0'); };
+  const fmt2 = t => t.toFixed(3);
+  const uid = () => 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+  /* ---------- channels & tabs (saved in localStorage) ---------- */
+  let DB = null;
+  function load(){
+    try{ DB = JSON.parse(localStorage.getItem('autocut.v2')||'null'); }catch(e){ DB = null; }
+    if(!DB || !Array.isArray(DB.channels) || !DB.channels.length){
+      const t = {id:uid(), name:'Видео 1'};
+      DB = {active:null, channels:[{id:uid(), name:'Мой канал', sub:'', tabs:[t], tab:t.id}]};
+      DB.active = DB.channels[0].id;
+    }
+  }
+  function save(){ try{ localStorage.setItem('autocut.v2', JSON.stringify(DB)); }catch(e){} }
+  const curCh = () => DB.channels.find(c => c.id===DB.active) || DB.channels[0];
+  const curTab = () => { const c = curCh(); return c.tabs.find(t => t.id===c.tab) || c.tabs[0]; };
+
+  function renderChannels(){
+    const sel = $('chSel'); sel.innerHTML = '';
+    DB.channels.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name || 'Без названия'; sel.appendChild(o); });
+    sel.value = curCh().id;
+    $('chName').value = curCh().name; $('chSub').value = curCh().sub || '';
+    $('chDel').disabled = DB.channels.length < 2;
+    $('chDel').style.opacity = DB.channels.length < 2 ? .35 : 1;
+  }
+  function renderTabs(){
+    const box = $('tabs'); box.innerHTML = '';
+    const c = curCh();
+    c.tabs.forEach(t => {
+      const el = document.createElement('div'); el.className = 'tab'+(t.id===c.tab?' on':'');
+      el.innerHTML = '<span class="t"></span>'; el.firstChild.textContent = t.name || 'Без названия';
+      el.title = 'Двойной щелчок - переименовать';
+      el.onclick = () => switchTab(t.id);
+      el.ondblclick = () => {
+        const inp = document.createElement('input'); inp.value = t.name; inp.maxLength = 40;
+        el.replaceChild(inp, el.firstChild); inp.focus(); inp.select();
+        const done = () => { t.name = inp.value.trim() || t.name; save(); renderTabs(); };
+        inp.onblur = done; inp.onclick = ev => ev.stopPropagation(); inp.ondblclick = ev => ev.stopPropagation();
+        inp.onkeydown = ev => { if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ inp.value = t.name; inp.blur(); } };
+      };
+      if(c.tabs.length > 1){
+        const x = document.createElement('button'); x.className = 'x'; x.innerHTML = '&times;'; x.title = 'Закрыть вкладку';
+        x.onclick = ev => { ev.stopPropagation(); closeTab(t.id); };
+        el.appendChild(x);
+      }
+      box.appendChild(el);
+    });
+    const add = document.createElement('button'); add.className = 'tabadd'; add.textContent = '+ Новое видео';
+    add.onclick = () => { const n = {id:uid(), name:'Видео '+(c.tabs.length+1)}; c.tabs.push(n); save(); switchTab(n.id); };
+    box.appendChild(add);
+  }
+  function stopAudio(){ au.pause(); }
+  function applyState(){
+    // bring audio + UI in line with the current tab state
+    stopAudio();
+    if(S.audioUrl){ au.src = S.audioUrl; } else { au.removeAttribute('src'); au.load(); }
+    if(S.mode==='rec' || S.mode==='review'){ S.mode = S.starts.length>1 ? 'done' : 'idle'; S.label = S.mode==='done' ? 'Запись приостановлена' : 'Добавьте файлы слева'; }
+    $('modal').classList.remove('on');
+    $('bPause').textContent = 'Пауза (P)';
+    lastShown = -1;
+    renderFiles(); refresh(); setMode(S.mode, S.label);
+    showFrame(0, S.mode==='idle');
+  }
+  function switchTab(id){
+    const c = curCh(); c.tab = id; save();
+    if(!states[id]) states[id] = newState();
+    S = states[id]; renderTabs(); applyState();
+  }
+  function closeTab(id){
+    const c = curCh(); const st = states[id];
+    if(st && (st.imgs.length || st.audioName) && !confirm('Закрыть вкладку? Загруженные файлы и тайминги в ней пропадут.')) return;
+    const i = c.tabs.findIndex(t => t.id===id);
+    c.tabs.splice(i,1); delete states[id];
+    if(c.tab===id) c.tab = c.tabs[Math.max(0,i-1)].id;
+    save(); switchTab(c.tab);
+  }
+  function switchChannel(id){
+    DB.active = id; const c = curCh(); save();
+    renderChannels();
+    if(!c.tabs.find(t=>t.id===c.tab)) c.tab = c.tabs[0].id;
+    switchTab(c.tab);
+  }
+  $('chSel').onchange = e => switchChannel(e.target.value);
+  $('chAdd').onclick = () => {
+    const t = {id:uid(), name:'Видео 1'};
+    const c = {id:uid(), name:'Новый канал '+(DB.channels.length+1), sub:'', tabs:[t], tab:t.id};
+    DB.channels.push(c); switchChannel(c.id);
+    $('chName').focus(); $('chName').select();
+  };
+  $('chDel').onclick = () => {
+    if(DB.channels.length < 2) return;
+    if(!confirm('Удалить канал «'+curCh().name+'» со всеми вкладками?')) return;
+    stopAudio();
+    curCh().tabs.forEach(t => delete states[t.id]);
+    DB.channels = DB.channels.filter(c => c.id!==DB.active);
+    switchChannel(DB.channels[0].id);
+  };
+  $('chName').oninput = e => { curCh().name = e.target.value; const o = $('chSel').selectedOptions[0]; if(o) o.textContent = e.target.value || 'Без названия'; save(); };
+  $('chSub').oninput = e => { curCh().sub = e.target.value; save(); };
+
+  /* ---------- loading files ---------- */
+  function numKey(name){ const m = name.match(/(\d+)(?!.*\d)/); return m ? parseInt(m[1],10) : Infinity; }
+  const isImg = f => f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name);
+  const isAud = f => f.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|aac|flac)$/i.test(f.name);
+  const isTxt = f => f.type==='text/plain' || /\.txt$/i.test(f.name);
+
+  function renderFiles(){
+    const n = S.imgs.length;
+    $('sImg').textContent = n ? n+' шт. · '+S.imgs[0].name+' … '+S.imgs[n-1].name : 'Перетащите сюда картинки или нажмите, чтобы выбрать';
+    $('dImg').classList.toggle('ok', n>0);
+    $('sAud').textContent = S.audioName ? (S.dur ? S.audioName+' · '+fmt(S.dur) : 'Загружаю: '+S.audioName) : 'Перетащите сюда озвучку (mp3, wav, m4a)';
+    $('dAud').classList.toggle('ok', !!S.audioName);
+    $('sTxt').textContent = S.txtName ? S.lines.length+' строк · '+S.txtName : 'Перетащите сюда текст (одна строка на картинку)';
+    $('dTxt').classList.toggle('ok', !!S.txtName);
+  }
+
+  function loadImages(list){
+    const files = list.filter(isImg);
+    if(!files.length) return;
+    files.sort((a,b) => { const ka = numKey(a.name), kb = numKey(b.name); return ka!==kb ? ka-kb : a.name.localeCompare(b.name,undefined,{numeric:true}); });
+    S.imgs.forEach(i => URL.revokeObjectURL(i.url));
+    S.imgs = files.map(f => ({name:f.name, url:URL.createObjectURL(f), path: NATIVE ? NATIVE.pathFor(f) : ''}));
+    renderFiles(); refresh();
+  }
+  function loadAudio(f){
+    if(!f) return;
+    if(S.audioUrl) URL.revokeObjectURL(S.audioUrl);
+    S.audioUrl = URL.createObjectURL(f); S.audioName = f.name; S.audioPath = NATIVE ? NATIVE.pathFor(f) : ''; S.dur = 0;
+    au.src = S.audioUrl; renderFiles();
+  }
+  au.addEventListener('loadedmetadata', () => { S.dur = au.duration; renderFiles(); refresh(); });
+  au.addEventListener('error', () => { if(!au.getAttribute('src')) return; $('sAud').textContent = 'Не удалось прочитать звук'; $('dAud').classList.remove('ok'); });
+
+  function loadText(f){
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      let txt = String(r.result).replace(/^﻿/,'');
+      const out = [];
+      for(let raw of txt.split(/\r?\n/)){
+        let l = raw.trim();
+        if(!l) continue;
+        if(/^(ЧАСТЬ|PART)\s/i.test(l)) continue;
+        if(/^[-–—_=]{3,}$/.test(l)) continue;
+        if(/^Проверочный файл/i.test(l)) continue;
+        const m = l.match(/^\d+\s*\|\s*(.*?)\s*\|/);
+        if(m) l = m[1];
+        out.push(l);
+      }
+      S.lines = out; S.txtName = f.name; computeWeights();
+      renderFiles(); refresh();
+    };
+    r.readAsText(f,'utf-8');
+  }
+
+  $('fImg').addEventListener('change', e => { loadImages([...e.target.files]); e.target.value=''; });
+  $('fAud').addEventListener('change', e => { loadAudio(e.target.files[0]); e.target.value=''; });
+  $('fTxt').addEventListener('change', e => { loadText(e.target.files[0]); e.target.value=''; });
+
+  // drag & drop: files are sorted by type automatically, wherever they are dropped
+  function sortDrop(files){
+    const imgs = files.filter(isImg), aud = files.find(isAud), txt = files.find(isTxt);
+    if(imgs.length) loadImages(imgs);
+    if(aud) loadAudio(aud);
+    if(txt) loadText(txt);
+  }
+  let dragDepth = 0;
+  const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types||[])].includes('Files');
+  window.addEventListener('dragenter', e => { if(!hasFiles(e)) return; e.preventDefault(); dragDepth++; $('dropall').classList.add('on'); });
+  window.addEventListener('dragover',  e => { if(!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+    document.querySelectorAll('.drop').forEach(d => d.classList.toggle('over', d.contains(e.target))); });
+  window.addEventListener('dragleave', e => { if(!hasFiles(e)) return; dragDepth = Math.max(0,dragDepth-1); if(!dragDepth) $('dropall').classList.remove('on'); });
+  window.addEventListener('drop', e => {
+    if(!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; $('dropall').classList.remove('on');
+    document.querySelectorAll('.drop').forEach(d => d.classList.remove('over'));
+    if(S.mode==='rec') return;
+    sortDrop([...e.dataTransfer.files]);
+  });
+
+  function refresh(){
+    const ni = S.imgs.length, nt = S.lines.length;
+    $('stI').firstElementChild.textContent = ni;
+    $('stT').firstElementChild.textContent = nt;
+    $('stA').firstElementChild.textContent = S.dur ? fmt(S.dur) : '0:00';
+    $('stI').classList.toggle('bad', ni && nt && ni!==nt);
+    $('stT').classList.toggle('bad', ni && nt && ni!==nt);
+    let m = '';
+    if(ni && nt && ni!==nt) m = 'Картинок '+ni+', строк '+nt+'. Количество не совпадает — лишнее останется без текста/картинки.';
+    $('msg').textContent = m;
+    $('start').disabled = !(ni && S.dur) || S.mode==='rec';
+    if(S.mode==='idle') showFrame(0,true);
+  }
+
+  /* ---------- spoken-word highlight ---------- */
+  let W = {};              // per-line word weights (estimated speaking time)
+  let totalW = 1, wordEls = [], hlK = -2, hlLine = -1;
+  function wordsOf(line){ return line.split(/\s+/).filter(Boolean); }
+  const wWeight = w => w.length + 1 + (/[.,;:!?…—–-]["')»]?$/.test(w) ? 3 : 0);
+  function computeWeights(){
+    W = {}; totalW = 0;
+    S.lines.forEach((l,i) => { const ws = wordsOf(l).map(wWeight); W[i] = ws; totalW += ws.reduce((a,b)=>a+b,0); });
+    totalW = totalW || 1;
+  }
+  function setCurText(i, text, withWords){
+    const cur = $('cur'); cur.innerHTML = ''; wordEls = []; hlK = -2; hlLine = i;
+    if(!withWords){ cur.textContent = text; return; }
+    const box = document.createElement('div'); cur.appendChild(box);
+    const ws = wordsOf(text);
+    ws.forEach((w,k) => {
+      const sp = document.createElement('span'); sp.className = 'w'; sp.textContent = w;
+      box.appendChild(sp); if(k < ws.length-1) box.appendChild(document.createTextNode(' '));
+      wordEls.push(sp);
+    });
+  }
+  function setHL(k){
+    if(k === hlK) return; hlK = k;
+    wordEls.forEach((el,j) => { el.classList.toggle('done', j<k); el.classList.toggle('now', j===k); });
+  }
+  // which word of the current frame is being spoken right now
+  function currentWord(i){
+    if(!wordEls.length || S.starts[i]==null) return -1;
+    const ws = W[i]; if(!ws || !ws.length) return -1;
+    const sum = ws.reduce((a,b)=>a+b,0);
+    let dur;
+    if(S.mode==='review' || S.mode==='done'){ dur = durations()[i]; }
+    else { dur = sum * (S.dur / totalW); }          // recording: average speech speed
+    dur = Math.max(0.3, dur);
+    const p = Math.min(0.999, Math.max(0, (au.currentTime - S.starts[i]) / dur));
+    let acc = 0; const target = p*sum;
+    for(let k=0;k<ws.length;k++){ acc += ws[k]; if(target < acc) return k; }
+    return ws.length-1;
+  }
+
+  /* ---------- display ---------- */
+  function showFrame(i, preview){
+    const n = S.imgs.length;
+    $('frameLbl').textContent = 'Кадр '+(n? (i+1):'—')+' / '+(n||'—');
+    const stage = $('stage');
+    if(n){
+      let img = stage.querySelector('img');
+      if(!img){ stage.innerHTML = '<img alt=""><div class="badge"></div>'; img = stage.querySelector('img'); }
+      if(img.dataset.i !== String(i)){ img.src = S.imgs[i].url; img.dataset.i = i; }
+      stage.querySelector('.badge').textContent = S.imgs[i].name;
+    } else if(!stage.querySelector('.empty')){
+      stage.innerHTML = '<div class="empty"><b>Готов к работе</b>Перетащите в окно картинки, озвучку и текст, потом нажмите «Начать запись».</div>';
+    }
+    const live = (S.mode==='rec' || S.mode==='review');
+    $('cur').classList.toggle('live', live);
+    if(S.lines.length || !preview){
+      const t = S.lines[i] != null ? S.lines[i] : (S.lines.length ? '—' : '(текст не загружен)');
+      setCurText(i, t, live && S.lines[i] != null);
+      $('nxt').textContent = S.lines[i+1] != null ? S.lines[i+1] : (i+1>=n && n ? 'Это последний кадр' : '—');
+    } else {
+      setCurText(-1, 'Текст текущего кадра появится здесь', false); $('nxt').textContent = '—';
+    }
+    $('bar').style.width = n ? ((i+1)/n*100)+'%' : '0';
+  }
+
+  function setMode(m, label){
+    S.mode = m; S.label = label; $('modeLbl').textContent = label;
+    const rec = m==='rec', rev = m==='review';
+    $('bNext').disabled = !rec; $('bBack').disabled = !rec;
+    $('bPause').disabled = !(rec||rev);
+    $('bReview').disabled = !(S.starts.length && !rec);
+    $('bExport').disabled = !(S.starts.length && !rec);
+    $('start').disabled = rec || !(S.imgs.length && S.dur);
+  }
+
+  /* ---------- recording ---------- */
+  function startRec(){
+    if(!S.imgs.length || !S.dur) return;
+    au.pause(); au.currentTime = 0; au.playbackRate = parseFloat($('rate').value);
+    S.starts = [0]; S.idx = 0; computeWeights();
+    setMode('rec','Идёт запись · слушайте и жмите Пробел, когда фраза кадра закончилась');
+    showFrame(0); au.play();
+  }
+  function next(){
+    if(S.mode!=='rec') return;
+    if(S.idx >= S.imgs.length-1){ finish(); return; }
+    S.idx++; S.starts[S.idx] = au.currentTime;
+    showFrame(S.idx);
+  }
+  function back(){
+    if(S.mode!=='rec' || S.idx===0) return;
+    S.starts.length = S.idx;        // forget start of the current frame
+    S.idx--;
+    if($('rew').checked) au.currentTime = S.starts[S.idx];
+    showFrame(S.idx);
+  }
+  function finish(){
+    au.pause();
+    setMode('done','Запись завершена');
+    $('mInfo').textContent = S.imgs.length+' кадров · '+fmt(S.dur)+'. Тайминги сохранены, можно проверить результат или экспортировать.';
+    $('modal').classList.add('on');
+  }
+  function togglePause(){
+    if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? 'Продолжить (P)' : 'Пауза (P)'; }
+  }
+  au.addEventListener('ended', () => { if(S.mode==='rec') finish(); else if(S.mode==='review') setMode('done','Просмотр завершён'); });
+
+  /* ---------- review ---------- */
+  function review(){
+    if(!S.starts.length) return;
+    au.pause(); au.currentTime = 0; au.playbackRate = 1;
+    lastShown = -1; setMode('review','Просмотр результата'); au.play();
+    $('bPause').textContent = 'Пауза (P)';
+  }
+  function frameAt(t){
+    let lo=0, hi=S.starts.length-1, r=0;
+    while(lo<=hi){ const m=(lo+hi)>>1; if(S.starts[m]<=t){ r=m; lo=m+1; } else hi=m-1; }
+    return r;
+  }
+
+  /* ---------- clock ---------- */
+  let lastShown = -1;
+  function tick(){
+    $('time').textContent = fmt(au.currentTime)+' / '+fmt(S.dur);
+    if(S.mode==='review'){
+      const i = frameAt(au.currentTime);
+      if(i!==lastShown){ lastShown=i; showFrame(i); }
+    }
+    if(S.mode==='rec' || S.mode==='review'){
+      const fi = S.mode==='rec' ? S.idx : lastShown;
+      if(fi>=0) setHL(currentWord(fi));
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  /* ---------- export ---------- */
+  function durations(){
+    const n = S.starts.length, d = [];
+    for(let i=0;i<n;i++){
+      const end = i<n-1 ? S.starts[i+1] : S.dur;
+      d.push(Math.max(0.04, end - S.starts[i]));
+    }
+    return d;
+  }
+  function dl(name, text, mime){
+    const b = new Blob([text],{type:mime||'text/plain;charset=utf-8'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  }
+  function jsonData(){
+    const d = durations();
+    return {audio:S.audioName, total:S.dur, frames:S.starts.map((s,i)=>({n:i+1,image:S.imgs[i].name,start:+s.toFixed(3),duration:+d[i].toFixed(3),text:S.lines[i]||''}))};
+  }
+  $('eJson').onclick = () => dl('timeline.json', JSON.stringify(jsonData(),null,2),'application/json');
+  $('eCsv').onclick = () => {
+    const d = durations();
+    const q = s => '"'+String(s).replace(/"/g,'""')+'"';
+    let t = 'n,image,start,duration,text\r\n';
+    S.starts.forEach((s,i)=>{ t += [i+1,q(S.imgs[i].name),fmt2(s),fmt2(d[i]),q(S.lines[i]||'')].join(',')+'\r\n'; });
+    dl('timeline.csv','\ufeff'+t,'text/csv;charset=utf-8');
+  };
+  function concatText(){
+    const d = durations(); let t = '';
+    S.starts.forEach((s,i)=>{ t += "file '"+S.imgs[i].name.replace(/'/g,"'\\''")+"'\n"+'duration '+fmt2(d[i])+'\n'; });
+    t += "file '"+S.imgs[S.starts.length-1].name.replace(/'/g,"'\\''")+"'\n";
+    return t;
+  }
+  $('eConcat').onclick = () => dl('concat.txt', concatText());
+  $('eBat').onclick = () => {
+    const bat = '@echo off\r\nchcp 65001 >nul\r\nwhere ffmpeg >nul 2>nul || (echo ffmpeg not found. Install it first: https://ffmpeg.org/download.html & pause & exit /b 1)\r\n'+
+      'ffmpeg -y -f concat -safe 0 -i concat.txt -i "'+S.audioName+'" -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,fps=30,format=yuv420p" -c:v libx264 -preset medium -crf 18 -c:a aac -b:a 192k -shortest output.mp4\r\n'+
+      'echo Done: output.mp4\r\npause\r\n';
+    dl('render.bat', bat);
+  };
+  $('eClose').onclick = () => $('modal').classList.remove('on');
+  $('bExport').onclick = () => { $('mInfo').textContent = S.starts.length+' кадров · '+fmt(S.dur); $('modal').classList.add('on'); };
+
+  /* ---------- native render ---------- */
+  if(NATIVE){
+    $('eRender').style.display = 'block';
+    $('eBat').style.display = 'none'; $('eConcat').style.display = 'none';
+    $('hintWeb').textContent = 'Нажмите «Собрать видео», выберите, куда сохранить. ffmpeg уже встроен в программу.';
+    NATIVE.onProgress(v => { $('rbar').style.width = (v*100)+'%'; $('rtxt').textContent = 'Собираю видео… '+Math.round(v*100)+'%'; });
+    $('eRender').onclick = async () => {
+      const d = durations();
+      const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i]}));
+      $('rwrap').style.display = 'block';
+      if(!S.audioPath || frames.some(f=>!f.path)){ $('rtxt').textContent = 'Не удалось получить пути к файлам. Выберите файлы заново через кнопки слева.'; return; }
+      $('rbar').style.width='0'; $('rtxt').textContent = 'Собираю видео… 0%';
+      $('eRender').disabled = true;
+      const r = await NATIVE.render({frames, audioPath:S.audioPath});
+      $('eRender').disabled = false;
+      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out; NATIVE.showItem(r.out); }
+      else if(r.cancelled){ $('rwrap').style.display='none'; }
+      else { $('rtxt').textContent = r.error==='cancelled' ? 'Отменено' : 'Ошибка: '+r.error; }
+    };
+    $('rCancel').onclick = () => NATIVE.cancel();
+  }
+
+  /* ---------- buttons & keys ---------- */
+  $('start').onclick = startRec;
+  $('bNext').onclick = next;
+  $('bBack').onclick = back;
+  $('bPause').onclick = togglePause;
+  $('bReview').onclick = review;
+  $('rate').onchange = () => { if(S.mode==='rec') au.playbackRate = parseFloat($('rate').value); };
+
+  document.addEventListener('keydown', e => {
+    const tag = (e.target.tagName||'').toLowerCase();
+    if(tag==='select' && e.code==='Space') return;
+    if(tag==='textarea' || (tag==='input' && e.target.type==='text')) return;
+    if($('modal').classList.contains('on')){ if(e.key==='Escape') $('modal').classList.remove('on'); return; }
+    if(e.code==='Space'){ e.preventDefault(); if(S.mode==='rec') next(); }
+    else if(e.code==='ArrowLeft' || e.code==='Backspace'){ e.preventDefault(); back(); }
+    else if(e.code==='KeyP' || e.code==='KeyK'){ e.preventDefault(); togglePause(); }
+    else if(e.code==='KeyF'){ e.preventDefault(); if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }
+  });
+  // do not let buttons keep focus, otherwise Space would "click" them
+  document.addEventListener('click', e => { if(e.target.closest('button') && !e.target.closest('.modal')) e.target.closest('button').blur(); });
+
+  Object.defineProperty(window,'__autocut',{get:()=>S}); // for debugging
+  if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; }).catch(()=>{});
+  load(); renderChannels();
+  { const c = curCh(); const t = curTab(); c.tab = t.id; states[t.id] = S; renderTabs(); }
+  renderFiles(); refresh(); setMode('idle','Добавьте файлы слева');
+})();
+</script>
+</body>
+</html>
