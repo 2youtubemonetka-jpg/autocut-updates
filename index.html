@@ -194,6 +194,10 @@
   .libempty{grid-column:1/-1;text-align:center;color:var(--dim);padding:60px 10px}
 
   /* modal */
+  #licGate{position:fixed;inset:0;z-index:1000;background:var(--bg);display:none;place-items:center;padding:20px}
+  #licGate.on{display:grid}
+  #licGate .card{width:min(520px,94vw)}
+  #licGate input[type=text]{width:100%;font:600 18px/1.2 monospace;letter-spacing:1px;text-transform:uppercase;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);margin:10px 0}
   .modal{position:fixed;inset:0;background:rgba(10,12,18,.62);display:none;place-items:center;z-index:20}
   .modal.on{display:grid}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;width:min(520px,92vw)}
@@ -319,6 +323,7 @@
     <button class="btn" id="auto" disabled style="width:100%;margin-top:-6px" title="Программа сама найдёт, где заканчивается каждая строка, по паузам в озвучке">Разметить автоматически</button>
 
     <div class="keys" id="keys"></div>
+    <div class="hint" id="licLine" style="margin:10px 0 0;display:none"></div>
     <button class="btn" id="supOpen" style="width:100%;margin-top:10px">Поддержка</button>
   </aside>
 
@@ -400,6 +405,18 @@
 </div>
 
 <div class="dropall" id="dropall">Отпустите файлы: картинки, озвучку или текст</div>
+
+<div id="licGate">
+  <div class="card">
+    <h2>Нужна подписка</h2>
+    <p style="margin:0 0 10px;color:var(--dim);font-size:14px;line-height:1.5" id="licMsg">Чтобы пользоваться AutoCut, нужен ключ подписки. Откройте нашего бота в Telegram: там можно купить подписку или включить пробный период на 12 часов. Бот пришлёт ключ, его нужно ввести здесь один раз.</p>
+    <div class="row" style="margin-bottom:6px"><div style="flex:1;font:600 16px/1.2 inherit" id="licBot">@AutoCutSubscribe_bot</div><button class="btn" id="licCopy" style="width:auto;margin:0;padding:7px 12px">Копировать</button></div>
+    <input type="text" id="licKey" placeholder="AC-XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+    <div id="licErr" style="color:#ff6b6b;font-size:13.5px;min-height:18px;margin-bottom:8px"></div>
+    <button class="btn primary" id="licGo">Активировать</button>
+    <div class="hint" style="margin-top:10px">Поддержка (только по делу): @DominatingOverYou, @HasYst</div>
+  </div>
+</div>
 
 <div class="modal" id="supModal">
   <div class="card" style="width:min(460px,92vw)">
@@ -785,6 +802,99 @@
   document.querySelectorAll('#supModal [data-copy]').forEach(b => b.onclick = async () => {
     try{ await navigator.clipboard.writeText(b.dataset.copy); toast('Скопировано: '+b.dataset.copy); }catch(e){ toast('Выделите и скопируйте вручную: '+b.dataset.copy); }
   });
+
+  /* ---------- subscription (licence key checked against our server) ---------- */
+  // Switched on by publishing enabled:true, a server address and the public key. Until then nothing is locked.
+  const LIC = Object.assign({enabled:false, server:'', pub:'', bot:'AutoCutSubscribe_bot', refreshMin:30}, window.__LIC || {});
+  const licB64 = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
+  const licDev = (() => { try{ let d = localStorage.getItem('autocut.dev'); if(!d){ d = (crypto.randomUUID ? crypto.randomUUID() : uid()+uid()); localStorage.setItem('autocut.dev', d); } return d; }catch(e){ return 'nodev'; } })();
+  const LIC_ERR = {
+    not_found:'Ключ не найден. Проверьте, что он введён без ошибок.', revoked:'Ключ заблокирован. Напишите в поддержку.',
+    device_mismatch:'Ключ уже привязан к другому компьютеру. Откройте бота, нажмите «Сменить компьютер» и введите ключ снова.',
+    expired:'Срок подписки закончился. Продлите её в боте.', trial_used:'Пробный период на этом компьютере уже использовался. Купите подписку в боте.',
+    rate_limited:'Слишком много попыток. Подождите минуту.', bad_request:'Введите ключ целиком.', network:'Нет связи с сервером. Проверьте интернет и попробуйте снова.',
+    bad_sig:'Ответ сервера не прошёл проверку. Попробуйте позже.', server:'Ошибка сервера. Попробуйте позже.'
+  };
+  let licCur = null, licTimer = null;
+  async function licVerify(payloadB64, sigB64){
+    try{
+      const key = await crypto.subtle.importKey('raw', licB64(LIC.pub), {name:'ECDSA', namedCurve:'P-256'}, false, ['verify']);
+      const raw = licB64(payloadB64);
+      const ok = await crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, key, licB64(sigB64), raw);
+      return ok ? JSON.parse(new TextDecoder().decode(raw)) : null;
+    }catch(e){ return null; }
+  }
+  const licStored = () => { try{ return JSON.parse(localStorage.getItem('autocut.lic')||'null'); }catch(e){ return null; } };
+  async function licLocal(){
+    const st = licStored(); if(!st || !st.payload) return null;
+    const p = await licVerify(st.payload, st.sig); if(!p || p.d !== licDev) return null;
+    return (Date.now()/1000 < p.v) ? p : null;
+  }
+  async function licOnline(key){
+    let r;
+    try{
+      const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 9000);
+      const resp = await fetch(LIC.server.replace(/\/$/,'') + '/api/activate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key, device:licDev}), signal:ac.signal});
+      clearTimeout(to); r = await resp.json();
+    }catch(e){ return {ok:false, error:'network'}; }
+    if(!r || !r.ok) return {ok:false, error:(r && r.error) || 'server'};
+    const p = await licVerify(r.payload, r.sig); if(!p || p.d !== licDev || p.k !== key) return {ok:false, error:'bad_sig'};
+    try{ localStorage.setItem('autocut.lic', JSON.stringify({key, payload:r.payload, sig:r.sig})); }catch(e){}
+    return {ok:true, p};
+  }
+  function licLine(p){
+    const el = $('licLine'); if(!p){ el.style.display = 'none'; return; }
+    let t;
+    if(!p.e) t = 'Подписка: навсегда';
+    else { const left = p.e - Date.now()/1000; t = p.p === 'trial' ? 'Пробный период: осталось '+Math.max(0, Math.ceil(left/3600))+' ч' : 'Подписка: осталось '+Math.max(0, Math.ceil(left/86400))+' дн.'; }
+    el.textContent = t; el.style.display = '';
+  }
+  function licLock(msg){
+    if(window.__licLocked !== true){ try{ stopAudio(); if(activeId) saveProject(activeId); }catch(e){} }
+    window.__licLocked = true; licCur = null; licLine(null);
+    $('licErr').textContent = msg || ''; $('licGate').classList.add('on');
+    const st = licStored(); if(st && st.key && !$('licKey').value) $('licKey').value = st.key;
+  }
+  function licOpen(p){ window.__licLocked = false; licCur = p; licLine(p); $('licGate').classList.remove('on'); $('licErr').textContent = ''; }
+  async function licCheck(initial){
+    const st = licStored(); const local = await licLocal();
+    if(local && !initial){ licCur = local; licLine(local); }
+    if(st && st.key){
+      const r = await licOnline(st.key);
+      if(r.ok){ licOpen(r.p); return; }
+      if(r.error === 'network' || r.error === 'server' || r.error === 'rate_limited'){
+        if(local){ licOpen(local); return; }                  // offline but the saved token is still valid
+        return licLock(LIC_ERR[r.error]);
+      }
+      return licLock(LIC_ERR[r.error] || r.error);
+    }
+    if(local){ licOpen(local); return; }
+    licLock('');
+  }
+  async function licInit(){
+    if(!LIC.enabled || !LIC.server || !LIC.pub) return;
+    $('licBot').textContent = '@'+LIC.bot;
+    $('licCopy').onclick = async () => { try{ await navigator.clipboard.writeText('@'+LIC.bot); toast('Скопировано'); }catch(e){ toast('Найдите в Telegram: @'+LIC.bot); } };
+    $('licKey').addEventListener('keydown', e => { e.stopPropagation(); if(e.key==='Enter') $('licGo').click(); });
+    $('licGo').onclick = async () => {
+      const key = $('licKey').value.trim().toUpperCase(); if(!key){ $('licErr').textContent = LIC_ERR.bad_request; return; }
+      $('licGo').disabled = true; $('licErr').textContent = 'Проверяю…';
+      const r = await licOnline(key); $('licGo').disabled = false;
+      if(r.ok) licOpen(r.p); else $('licErr').textContent = LIC_ERR[r.error] || r.error;
+    };
+    window.__licLocked = true;                                  // closed until the first check passes
+    $('licGate').classList.add('on');
+    await licCheck(true);
+    clearInterval(licTimer);
+    let last = Date.now();
+    licTimer = setInterval(async () => {
+      const p = await licLocal();
+      if(!p){ await licCheck(false); last = Date.now(); return; }
+      licLine(p);
+      if(Date.now() - last > LIC.refreshMin*60000){ last = Date.now(); licCheck(false); }
+    }, 60000);
+  }
+  licInit();
 
   /* ---------- channels, projects (tabs) and autosave ---------- */
   let DB = null, VIEW = 'work', activeId = null;
@@ -1760,6 +1870,7 @@ const AutoAlign = (function(){
   $('rate').onchange = () => { if(S.mode==='rec') au.playbackRate = parseFloat($('rate').value); };
 
   document.addEventListener('keydown', e => {
+    if(window.__licLocked) return;
     if(capturing){ e.preventDefault(); e.stopPropagation(); captureKey(e); return; }
     const tag = (e.target.tagName||'').toLowerCase();
     if(VIEW==='lib' && actionOf(e.code)!=='full') return;
