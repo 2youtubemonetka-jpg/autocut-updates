@@ -612,7 +612,7 @@
     send(method, params, sessionId){ return new Promise((ok, no) => { const id = ++this.id; this.cb[id] = [ok, no];
       this.ws.send(JSON.stringify(Object.assign({id, method, params: params||{}}, sessionId ? {sessionId} : {}))); setTimeout(() => { if(this.cb[id]){ delete this.cb[id]; no(new Error('Нет ответа от Chrome: '+method)); } }, 60000); }); }
   }
-  const G = {run:false, stop:false, cdp:null, sid:null, dir:'', sep:'/', log:[]};
+  const G = {run:false, stop:false, tok:0, cdp:null, sid:null, dir:'', sep:'/', log:[]};
   const glog = t => { const el = $('gLog'); const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString('ru-RU')+'  '+t; el.appendChild(d); el.scrollTop = el.scrollHeight; };
   function parsePrompts(txt){
     return String(txt||'').replace(/\r/g,'').split(/\n\s*\n/).map(p => p.split('\n').map(l => l.trim()).filter(Boolean).join(' ')).filter(Boolean);
@@ -646,13 +646,14 @@
     await G.cdp.send('Page.enable', {}, G.sid); await G.cdp.send('Runtime.enable', {}, G.sid);
   }
   const gEval = async expr => { const r = await G.cdp.send('Runtime.evaluate', {expression: expr, returnByValue: true, awaitPromise: true}, G.sid); return r.result ? r.result.value : undefined; };
-  async function genScene(n, prompt){
+  async function genScene(n, prompt, tok){
+    const dead = () => tok !== G.tok;
     const cdp = G.cdp, sid = G.sid;
     await cdp.send('Page.navigate', {url: GEN.url}, sid);
     // page and input box
     let ok = false, t0 = Date.now();
     const selJs = JSON.stringify(GEN.input);
-    while(Date.now()-t0 < 40000 && !G.stop){
+    while(Date.now()-t0 < 40000 && !dead()){
       ok = await gEval('(()=>{for(const s of '+selJs+'){const e=document.querySelector(s); if(e&&e.offsetParent!==null){e.focus(); return true;}} return false;})()').catch(() => false);
       if(ok) break; await gsleep(800);
     }
@@ -662,11 +663,11 @@
     for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid);
     // wait for the download button of the finished picture
     const re = GEN.dlRe.source; let rect = null; t0 = Date.now();
-    while(Date.now()-t0 < GEN.waitImage && !G.stop){
+    while(Date.now()-t0 < GEN.waitImage && !dead()){
       rect = await gEval('(()=>{const re=new RegExp('+JSON.stringify(re)+',"i"); for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||""); if(re.test(l)){b.scrollIntoView({block:"center"}); const r=b.getBoundingClientRect(); if(r.width>0&&r.height>0) return {x:r.left+r.width/2,y:r.top+r.height/2};}} return null;})()').catch(() => null);
       if(rect) break; await gsleep(2000);
     }
-    if(G.stop) throw new Error('stopped');
+    if(dead()) throw new Error('stopped');
     if(!rect) throw new Error('Картинка не появилась за '+Math.round(GEN.waitImage/1000)+' с (возможно, лимит Gemini)');
     await gsleep(1500);
     rect = await gEval('(()=>{const re=new RegExp('+JSON.stringify(re)+',"i"); for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||""); if(re.test(l)){const r=b.getBoundingClientRect(); if(r.width>0) return {x:r.left+r.width/2,y:r.top+r.height/2};}} return null;})()') || rect;
@@ -687,26 +688,27 @@
     if(G.run) return;
     const prompts = parsePrompts($('gPrompts').value); if(!prompts.length){ toast('Вставьте промты'); return; }
     S.gen.text = $('gPrompts').value; touch();
-    G.run = true; G.stop = false; $('gStart').style.display = 'none'; $('gStop').style.display = '';
+    G.run = true; const tok = ++G.tok; const dead = () => tok !== G.tok; $('gStart').style.display = 'none'; $('gStop').style.display = '';
     try{
       await genDirFor(); G.tmp = await NATIVE.gen.tmp(); await genConnect();
       await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath: G.tmp, eventsEnabled:true});
       const delay = parseInt($('gDelay').value,10) || 5; let fails = 0;
-      for(let n = 1; n <= prompts.length && !G.stop; n++){
+      for(let n = 1; n <= prompts.length && !dead(); n++){
         if((await doneSet()).has(n)) continue;
         glog('Сцена '+n+' из '+prompts.length+': '+prompts[n-1].slice(0,50)+'…');
         let okk = false, lastErr = '';
-        for(let k = 1; k <= GEN.tries && !okk && !G.stop; k++){
-          try{ await genScene(n, prompts[n-1]); okk = true; glog('  сохранено '+imgName(n)); }
-          catch(e){ lastErr = e.message; if(G.stop) break; glog('  ошибка: '+e.message+(k<GEN.tries ? ' — пробую ещё раз' : '')); await gsleep(3000); }
+        for(let k = 1; k <= GEN.tries && !okk && !dead(); k++){
+          try{ await genScene(n, prompts[n-1], tok); okk = true; glog('  сохранено '+imgName(n)); }
+          catch(e){ lastErr = e.message; if(dead()) break; glog('  ошибка: '+e.message+(k<GEN.tries ? ' — пробую ещё раз' : '')); await gsleep(3000); }
         }
-        if(!okk && !G.stop){ fails++; glog('  сцена '+n+' пропущена'); if(fails >= 5 && /лимит|не найдено поле|Chrome/.test(lastErr)){ glog('Слишком много ошибок подряд, останавливаюсь.'); break; } } else fails = 0;
+        if(!okk && !dead()){ fails++; glog('  сцена '+n+' пропущена'); if(fails >= 5 && /лимит|не найдено поле|Chrome/.test(lastErr)){ glog('Слишком много ошибок подряд, останавливаюсь.'); break; } } else fails = 0;
         await genStat();
-        if(!G.stop) await gsleep((delay + Math.random()*delay)*1000);
+        if(!dead()) await gsleep((delay + Math.random()*delay)*1000);
       }
       const st = await genStat();
-      glog(G.stop ? 'Остановлено.' : (st.ok >= st.total ? 'Готово! Нажмите «Добавить в проект».' : 'Завершено, но не все сцены готовы. Нажмите «Старт» ещё раз: сделанные пропустятся.'));
-    }catch(e){ glog('Ошибка: '+e.message); }
+      if(!dead()) glog((st.ok >= st.total ? 'Готово! Нажмите «Добавить в проект».' : 'Завершено, но не все сцены готовы. Нажмите «Старт» ещё раз: сделанные пропустятся.'));
+    }catch(e){ if(!dead()) glog('Ошибка: '+e.message); }
+    if(dead()) return;                       // the Stop button already reset everything
     G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none';
   }
   async function genUse(){
@@ -725,7 +727,7 @@
     $('gPrompts').oninput = () => { S.gen.text = $('gPrompts').value; touch(); genStat(); };
     $('gFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; $('gPrompts').value = await f.text(); S.gen.text = $('gPrompts').value; touch(); genStat(); };
     $('gLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:GEN.url}); glog(r.ok ? 'Chrome запущен. Войдите в Google, если нужно, и нажмите «Старт».' : 'Ошибка: '+r.error); };
-    $('gStart').onclick = genStart; $('gStop').onclick = () => { G.stop = true; glog('Останавливаю после текущей операции…'); };
+    $('gStart').onclick = genStart; $('gStop').onclick = () => { G.tok++; G.stop = true; try{ if(G.cdp) G.cdp.ws.close(); }catch(e){} G.cdp = null; G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none'; glog('Остановлено. Сделанные картинки сохранены, «Старт» продолжит с места остановки.'); genStat(); };
     $('gUse').onclick = genUse; $('gClose').onclick = () => $('genModal').classList.remove('on');
   }
 
