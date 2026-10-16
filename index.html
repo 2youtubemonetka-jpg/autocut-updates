@@ -671,7 +671,7 @@
     await gsleep(1500);
     rect = await gEval('(()=>{const re=new RegExp('+JSON.stringify(re)+',"i"); for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||""); if(re.test(l)){const r=b.getBoundingClientRect(); if(r.width>0) return {x:r.left+r.width/2,y:r.top+r.height/2};}} return null;})()') || rect;
     const got = new Promise((ok, no) => { const to = setTimeout(() => { cdp.ev = cdp.ev.filter(f => f!==h); no(new Error('Скачивание не началось')); }, GEN.waitDownload);
-      const h = d => { if(if(d.method==='Browser.downloadProgress' && d.params.state==='completed'){ clearTimeout(to); cdp.ev = cdp.ev.filter(f => f!==h); ok(d.params.guid); }
+      const h = d => { if(d.method==='Browser.downloadProgress' && d.params.state==='completed'){ clearTimeout(to); cdp.ev = cdp.ev.filter(f => f!==h); ok(d.params.guid); }
                         else if(d.method==='Browser.downloadProgress' && d.params.state==='canceled'){ clearTimeout(to); cdp.ev = cdp.ev.filter(f => f!==h); no(new Error('Скачивание отменено')); } };
       cdp.ev.push(h); });
     await cdp.send('Input.dispatchMouseEvent', {type:'mouseMoved', x:rect.x, y:rect.y}, sid);
