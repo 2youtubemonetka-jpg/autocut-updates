@@ -84,11 +84,13 @@
 
   /* channel box */
   .chbox{border:1px solid var(--accent);background:var(--tint);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
-  .chbox .row{gap:6px}
-  .chbox select{flex:1;min-width:0}
+  .chbox{grid-template-columns:minmax(0,1fr);overflow:hidden}
+  .chbox .row{gap:6px;min-width:0}
+  .chbox select{flex:1 1 0;min-width:0;width:0;text-overflow:ellipsis}
+  .mini{flex:none}
   .mini{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:16px;line-height:1;display:grid;place-items:center;padding:0}
   .mini:hover{border-color:var(--accent2)}
-  .chbox input{width:100%;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--text);font:inherit;padding:4px 6px;margin:0 -6px;outline:none}
+  .chbox input{width:calc(100% + 12px);min-width:0;text-overflow:ellipsis;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--text);font:inherit;padding:4px 6px;margin:0 -6px;outline:none}
   .chbox input:hover{border-color:var(--line)}
   .chbox input:focus{border-color:var(--accent2);background:var(--panel)}
   .chbox input.chname{font-weight:700;font-size:15.5px}
