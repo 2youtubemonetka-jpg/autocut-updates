@@ -9,6 +9,14 @@
     --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
     --text:#eef0f4; --dim:#8a92a3; --accent:#e63946; --accent2:#ffb703; --ok:#2ec27e; --warn:#f5a524;
     --r:14px;
+    --stage:#0a0b0e; --overlay:rgba(15,17,21,.85); --toast:#222733; --done:#f2d680; --now:#ff5a66; --nowbg:rgba(230,57,70,.20); --tint:rgba(230,57,70,.12);
+    color-scheme:dark;
+  }
+  :root[data-theme=light]{
+    --bg:#f3f4f7; --panel:#ffffff; --panel2:#eceef3; --line:#d5d9e2;
+    --text:#161922; --dim:#5d6578; --accent:#d62839; --accent2:#c98300; --ok:#14935c; --warn:#b36b00;
+    --stage:#e4e7ee; --overlay:rgba(255,255,255,.9); --toast:#ffffff; --done:#b07a00; --now:#c81e2f; --nowbg:rgba(214,40,57,.14); --tint:rgba(214,40,57,.08);
+    color-scheme:light;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0}
@@ -51,11 +59,11 @@
   .topbar .pill{background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:3px 12px;color:var(--text)}
   .topbar .grow{flex:1}
   .textcur{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:16px 22px;font-size:clamp(20px,2.4vw,32px);font-weight:600;line-height:1.3;min-height:84px;display:flex;align-items:center}
-  .stage{flex:1;min-height:0;display:grid;place-items:center;background:#0a0b0e;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;position:relative}
+  .stage{flex:1;min-height:0;display:grid;place-items:center;background:var(--stage);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;position:relative}
   .stage img{max-width:100%;max-height:100%;display:block}
   .stage .empty{color:var(--dim);text-align:center;padding:20px}
   .stage .empty b{display:block;font-size:20px;color:var(--text);margin-bottom:6px}
-  .badge{position:absolute;left:12px;top:12px;background:rgba(15,17,21,.85);border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-size:13px}
+  .badge{position:absolute;left:12px;top:12px;background:var(--overlay);border:1px solid var(--line);border-radius:8px;padding:3px 10px;font-size:13px}
   .textnext{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 22px;font-size:clamp(15px,1.5vw,20px);color:var(--dim);min-height:56px;display:flex;gap:12px;align-items:center}
   .textnext em{font-style:normal;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent2);flex:none}
   .prog{height:8px;background:var(--panel2);border-radius:99px;position:relative;overflow:hidden;border:1px solid var(--line)}
@@ -69,18 +77,18 @@
 
 
   /* channel box */
-  .chbox{border:1px solid var(--accent);background:rgba(230,57,70,.10);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+  .chbox{border:1px solid var(--accent);background:var(--tint);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
   .chbox .row{gap:6px}
   .chbox select{flex:1;min-width:0}
   .mini{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font-size:16px;line-height:1;display:grid;place-items:center;padding:0}
   .mini:hover{border-color:var(--accent2)}
   .chbox input{width:100%;background:transparent;border:1px solid transparent;border-radius:8px;color:var(--text);font:inherit;padding:4px 6px;margin:0 -6px;outline:none}
   .chbox input:hover{border-color:var(--line)}
-  .chbox input:focus{border-color:var(--accent2);background:rgba(0,0,0,.25)}
+  .chbox input:focus{border-color:var(--accent2);background:var(--panel)}
   .chbox input.chname{font-weight:700;font-size:15.5px}
   .chbox input.chsub{font-size:12.5px;color:var(--dim)}
-  .drop.over{border-color:var(--accent2);background:rgba(255,183,3,.10)}
-  .dropall{position:fixed;inset:0;z-index:50;background:rgba(15,17,21,.82);display:none;place-items:center;pointer-events:none;font-size:26px;font-weight:700;color:var(--accent2);border:3px dashed var(--accent2);margin:10px;border-radius:20px}
+  .drop.over{border-color:var(--accent2);background:var(--panel)}
+  .dropall{position:fixed;inset:0;z-index:50;background:var(--overlay);display:none;place-items:center;pointer-events:none;font-size:26px;font-weight:700;color:var(--accent2);border:3px dashed var(--accent2);margin:10px;border-radius:20px}
   .dropall.on{display:grid}
   /* tabs */
   .tabs{display:flex;gap:6px;align-items:flex-end;border-bottom:1px solid var(--line);margin:-4px 0 0;overflow-x:auto;flex:none}
@@ -95,31 +103,31 @@
   .tabadd:hover{color:var(--text);border-color:var(--accent2)}
   /* spoken-word highlight */
   .w{transition:color .1s,background .1s;border-radius:7px;padding:0 3px;margin:0 -3px}
-  .w.done{color:#f2d680}
-  .w.now{color:#ff5a66;background:rgba(230,57,70,.20);box-shadow:0 0 0 3px rgba(230,57,70,.20)}
-  .textcur.live{border-left-color:#ff5a66}
+  .w.done{color:var(--done)}
+  .w.now{color:var(--now);background:var(--nowbg);box-shadow:0 0 0 3px var(--nowbg)}
+  .textcur.live{border-left-color:var(--now)}
 
 
   /* nav + toast */
   .nav{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .nav button{padding:8px 6px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;font-size:13.5px;color:var(--dim)}
-  .nav button.on{background:rgba(230,57,70,.16);border-color:var(--accent);color:var(--text);font-weight:600}
+  .nav button.on{background:var(--tint);border-color:var(--accent);color:var(--text);font-weight:600}
   .nav button span{background:var(--accent);color:#fff;border-radius:99px;font-size:11px;padding:0 6px;margin-left:4px}
-  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#222733;border:1px solid var(--line);border-radius:12px;padding:10px 18px;opacity:0;pointer-events:none;transition:.25s;z-index:60;font-size:14px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--toast);border:1px solid var(--line);border-radius:12px;padding:10px 18px;box-shadow:0 6px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:60;font-size:14px}
   .toast.on{opacity:1;transform:translateX(-50%)}
   /* library */
   .libhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .libhead h2{margin:0;font-size:22px}
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{padding:5px 13px;border-radius:99px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px}
-  .chip.on{border-color:var(--accent2);color:var(--text);background:rgba(255,183,3,.10)}
+  .chip.on{border-color:var(--accent2);color:var(--text);background:var(--panel)}
   .libgrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;align-content:start;padding:2px 2px 14px}
   .pcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
   .pcard.cur{border-color:var(--accent)}
-  .pth{aspect-ratio:16/9;background:#0a0b0e;display:grid;place-items:center;color:var(--dim);font-size:13px;position:relative}
+  .pth{aspect-ratio:16/9;background:var(--stage);display:grid;place-items:center;color:var(--dim);font-size:13px;position:relative}
   .pth img{width:100%;height:100%;object-fit:cover;display:block}
-  .pst{position:absolute;left:8px;top:8px;background:rgba(15,17,21,.88);border:1px solid var(--line);border-radius:8px;padding:2px 9px;font-size:12px;color:var(--text)}
-  .pst.park{color:var(--accent2)} .pst.ok{color:var(--ok)} .pst.rec{color:#ff7a84}
+  .pst{position:absolute;left:8px;top:8px;background:var(--overlay);border:1px solid var(--line);border-radius:8px;padding:2px 9px;font-size:12px;color:var(--text)}
+  .pst.park{color:var(--accent2)} .pst.ok{color:var(--ok)} .pst.rec{color:var(--accent)}
   .pbody{padding:11px 13px 8px}
   .pbody b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pbody small{display:block;color:var(--dim);font-size:12.5px;margin-top:2px}
@@ -127,11 +135,11 @@
   .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
   .pact{display:flex;flex-wrap:wrap;gap:6px;padding:4px 13px 13px;margin-top:auto}
   .pact .btn{padding:6px 11px;font-size:13px}
-  .pact .btn.del:hover{border-color:var(--accent);color:#ff7a84}
+  .pact .btn.del:hover{border-color:var(--accent);color:var(--accent)}
   .libempty{grid-column:1/-1;text-align:center;color:var(--dim);padding:60px 10px}
 
   /* modal */
-  .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;place-items:center;z-index:20}
+  .modal{position:fixed;inset:0;background:rgba(10,12,18,.62);display:none;place-items:center;z-index:20}
   .modal.on{display:grid}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;width:min(520px,92vw)}
   .card h2{margin:0 0 6px}
@@ -141,10 +149,11 @@
 </style>
 </head>
 <body>
+<script>try{var th=localStorage.getItem('autocut.theme'); if(th==='light') document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <div class="app">
 
   <aside class="side">
-    <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small></div>
+    <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small><button class="mini" id="theme" title="Сменить тему: тёмная / светлая" style="width:auto;padding:0 9px;font-size:12px;height:28px"></button></div>
 
     <div class="nav"><button id="navWork" class="on">Работа</button><button id="navLib">Библиотека<span id="libCnt">0</span></button></div>
 
@@ -279,6 +288,15 @@
   const fmt = t => { t = Math.max(0, t||0); const m = Math.floor(t/60), s = Math.floor(t%60); return m+':'+String(s).padStart(2,'0'); };
   const fmt2 = t => t.toFixed(3);
   const uid = () => 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
+  /* ---------- theme ---------- */
+  function applyTheme(t){
+    if(t==='light') document.documentElement.setAttribute('data-theme','light'); else document.documentElement.removeAttribute('data-theme');
+    $('theme').textContent = t==='light' ? 'Тёмная' : 'Светлая';
+    try{ localStorage.setItem('autocut.theme', t); }catch(e){}
+  }
+  $('theme').onclick = () => applyTheme(document.documentElement.getAttribute('data-theme')==='light' ? 'dark' : 'light');
+  applyTheme(document.documentElement.getAttribute('data-theme')==='light' ? 'light' : 'dark');
 
   /* ---------- channels, projects (tabs) and autosave ---------- */
   let DB = null, VIEW = 'work', activeId = null;
