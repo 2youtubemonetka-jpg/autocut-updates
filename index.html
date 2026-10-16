@@ -99,6 +99,37 @@
   .w.now{color:#ff5a66;background:rgba(230,57,70,.20);box-shadow:0 0 0 3px rgba(230,57,70,.20)}
   .textcur.live{border-left-color:#ff5a66}
 
+
+  /* nav + toast */
+  .nav{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .nav button{padding:8px 6px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;font-size:13.5px;color:var(--dim)}
+  .nav button.on{background:rgba(230,57,70,.16);border-color:var(--accent);color:var(--text);font-weight:600}
+  .nav button span{background:var(--accent);color:#fff;border-radius:99px;font-size:11px;padding:0 6px;margin-left:4px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#222733;border:1px solid var(--line);border-radius:12px;padding:10px 18px;opacity:0;pointer-events:none;transition:.25s;z-index:60;font-size:14px}
+  .toast.on{opacity:1;transform:translateX(-50%)}
+  /* library */
+  .libhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .libhead h2{margin:0;font-size:22px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:5px 13px;border-radius:99px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px}
+  .chip.on{border-color:var(--accent2);color:var(--text);background:rgba(255,183,3,.10)}
+  .libgrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;align-content:start;padding:2px 2px 14px}
+  .pcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+  .pcard.cur{border-color:var(--accent)}
+  .pth{aspect-ratio:16/9;background:#0a0b0e;display:grid;place-items:center;color:var(--dim);font-size:13px;position:relative}
+  .pth img{width:100%;height:100%;object-fit:cover;display:block}
+  .pst{position:absolute;left:8px;top:8px;background:rgba(15,17,21,.88);border:1px solid var(--line);border-radius:8px;padding:2px 9px;font-size:12px;color:var(--text)}
+  .pst.park{color:var(--accent2)} .pst.ok{color:var(--ok)} .pst.rec{color:#ff7a84}
+  .pbody{padding:11px 13px 8px}
+  .pbody b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pbody small{display:block;color:var(--dim);font-size:12.5px;margin-top:2px}
+  .pbar{height:5px;background:var(--panel2);border-radius:9px;margin-top:8px;overflow:hidden}
+  .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .pact{display:flex;flex-wrap:wrap;gap:6px;padding:4px 13px 13px;margin-top:auto}
+  .pact .btn{padding:6px 11px;font-size:13px}
+  .pact .btn.del:hover{border-color:var(--accent);color:#ff7a84}
+  .libempty{grid-column:1/-1;text-align:center;color:var(--dim);padding:60px 10px}
+
   /* modal */
   .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;place-items:center;z-index:20}
   .modal.on{display:grid}
@@ -114,6 +145,8 @@
 
   <aside class="side">
     <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small></div>
+
+    <div class="nav"><button id="navWork" class="on">Работа</button><button id="navLib">Библиотека<span id="libCnt">0</span></button></div>
 
     <div class="sec">
       <h4>Канал / аккаунт</h4>
@@ -166,12 +199,13 @@
     </div>
   </aside>
 
-  <main class="main">
+  <main class="main" id="work">
     <div class="tabs" id="tabs"></div>
     <div class="topbar">
       <span class="pill" id="frameLbl">Кадр — / —</span>
       <span id="partLbl"></span>
       <span class="grow"></span>
+      <button class="btn" id="bPark" style="padding:3px 12px;font-size:12.5px" title="Сохранить и убрать в библиотеку. Позже можно продолжить с этого же места">Отложить проект</button>
       <span id="modeLbl">Добавьте файлы слева</span>
     </div>
     <div class="textcur" id="cur">Текст текущего кадра появится здесь</div>
@@ -189,6 +223,30 @@
       <span class="time" id="time">0:00 / 0:00</span>
     </div>
   </main>
+
+  <main class="main" id="lib" style="display:none">
+    <div class="libhead">
+      <h2>Библиотека</h2>
+      <div class="chips" id="libChips"></div>
+      <span style="flex:1"></span>
+      <select id="libCh"></select>
+      <button class="btn primary" id="libNew">+ Новый проект</button>
+    </div>
+    <div class="libgrid" id="libGrid"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="resume">
+  <div class="card">
+    <h2>Незавершённый проект</h2>
+    <p id="rInfo"></p>
+    <button class="btn primary" id="rGo">Продолжить с этого места</button>
+    <button class="btn" id="rPark">Отложить на потом</button>
+    <button class="btn" id="rDel">Удалить проект</button>
+    <button class="btn" id="rLater">Решу позже</button>
+  </div>
 </div>
 
 <div class="dropall" id="dropall">Отпустите файлы: картинки, озвучку или текст</div>
@@ -222,19 +280,73 @@
   const fmt2 = t => t.toFixed(3);
   const uid = () => 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
-  /* ---------- channels & tabs (saved in localStorage) ---------- */
-  let DB = null;
+  /* ---------- channels, projects (tabs) and autosave ---------- */
+  let DB = null, VIEW = 'work', activeId = null;
   function load(){
     try{ DB = JSON.parse(localStorage.getItem('autocut.v2')||'null'); }catch(e){ DB = null; }
     if(!DB || !Array.isArray(DB.channels) || !DB.channels.length){
-      const t = {id:uid(), name:'Видео 1'};
+      const t = {id:uid(), name:'Видео 1', open:true, updated:Date.now()};
       DB = {active:null, channels:[{id:uid(), name:'Мой канал', sub:'', tabs:[t], tab:t.id}]};
       DB.active = DB.channels[0].id;
     }
   }
   function save(){ try{ localStorage.setItem('autocut.v2', JSON.stringify(DB)); }catch(e){} }
   const curCh = () => DB.channels.find(c => c.id===DB.active) || DB.channels[0];
-  const curTab = () => { const c = curCh(); return c.tabs.find(t => t.id===c.tab) || c.tabs[0]; };
+  const openTabs = c => c.tabs.filter(t => t.open !== false);
+  function ensureTab(c){
+    let o = openTabs(c);
+    if(!o.length){ const n = {id:uid(), name:'Видео '+(c.tabs.length+1), open:true, updated:Date.now()}; c.tabs.push(n); c.tab = n.id; o = [n]; }
+    return o[0];
+  }
+  const curTab = () => { const c = curCh(); return openTabs(c).find(t => t.id===c.tab) || ensureTab(c); };
+  function findTab(id){ for(const c of DB.channels){ const t = c.tabs.find(x => x.id===id); if(t) return {c, t}; } return null; }
+  const pKey = id => 'autocut.p.'+id;
+  function fileUrl(p){
+    p = String(p).replace(/\\/g,'/'); let pre = 'file://';
+    if(/^[A-Za-z]:/.test(p)){ pre += '/'+p.slice(0,2); p = p.slice(2); } else if(!p.startsWith('/')) p = '/'+p;
+    return pre + p.split('/').map(encodeURIComponent).join('/');
+  }
+  function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2800); }
+
+  function serialize(st){
+    return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
+            audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
+            pos:st.pos||0, rendered:!!st.rendered};
+  }
+  function saveProject(id){
+    const st = states[id], f = findTab(id); if(!st || !f) return;
+    if(id===activeId && st.mode==='rec') st.pos = au.currentTime;
+    try{ localStorage.setItem(pKey(id), JSON.stringify(serialize(st))); }catch(e){}
+    f.t.updated = Date.now();
+    f.t.sum = {n:st.imgs.length, t:st.lines.length, rec:st.starts.length, mode:st.mode, audio:st.audioName,
+               thumb:(st.imgs[0] && st.imgs[0].path) || '', rendered:!!st.rendered};
+    save();
+  }
+  let saveTimer = null;
+  function touch(){ clearTimeout(saveTimer); saveTimer = setTimeout(() => { try{ if(activeId) saveProject(activeId); }catch(e){} }, 400); }
+  setInterval(() => { if(activeId && S.mode==='rec') saveProject(activeId); }, 3000);
+  window.addEventListener('beforeunload', () => { try{ if(activeId) saveProject(activeId); }catch(e){} });
+  document.addEventListener('visibilitychange', () => { try{ if(document.hidden && activeId) saveProject(activeId); }catch(e){} });
+
+  // rebuild a project's state from what was saved
+  function hydrate(id){
+    const st = newState(); states[id] = st;
+    let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
+    if(!d) return st;
+    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered;
+    if(NATIVE){
+      st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
+      if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
+      st.dur = d.dur || 0;
+      if(st.imgs.length && st.imgs.length === (d.imgs||[]).length){
+        st.starts = d.starts || []; st.idx = Math.min(d.idx||0, st.imgs.length-1); st.pos = d.pos || 0;
+        st.mode = (d.mode==='rec' && st.starts.length) ? 'rec' : (st.starts.length>1 ? 'done' : 'idle');
+      }
+      if(st.mode==='done') st.label = 'Запись завершена';
+      if(st.imgs.length){ const t = new Image(); t.onerror = () => { st.missing = true; if(S===st) refresh(); }; t.src = st.imgs[0].url; }
+    } else { st.audioName = ''; }
+    return st;
+  }
 
   function renderChannels(){
     const sel = $('chSel'); sel.innerHTML = '';
@@ -247,11 +359,11 @@
   function renderTabs(){
     const box = $('tabs'); box.innerHTML = '';
     const c = curCh();
-    c.tabs.forEach(t => {
+    openTabs(c).forEach(t => {
       const el = document.createElement('div'); el.className = 'tab'+(t.id===c.tab?' on':'');
       el.innerHTML = '<span class="t"></span>'; el.firstChild.textContent = t.name || 'Без названия';
       el.title = 'Двойной щелчок - переименовать';
-      el.onclick = () => switchTab(t.id);
+      el.onclick = () => { if(VIEW!=='work') setView('work'); if(t.id!==activeId) switchTab(t.id); };
       el.ondblclick = () => {
         const inp = document.createElement('input'); inp.value = t.name; inp.maxLength = 40;
         el.replaceChild(inp, el.firstChild); inp.focus(); inp.select();
@@ -259,65 +371,160 @@
         inp.onblur = done; inp.onclick = ev => ev.stopPropagation(); inp.ondblclick = ev => ev.stopPropagation();
         inp.onkeydown = ev => { if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ inp.value = t.name; inp.blur(); } };
       };
-      if(c.tabs.length > 1){
-        const x = document.createElement('button'); x.className = 'x'; x.innerHTML = '&times;'; x.title = 'Закрыть вкладку';
-        x.onclick = ev => { ev.stopPropagation(); closeTab(t.id); };
-        el.appendChild(x);
-      }
+      const x = document.createElement('button'); x.className = 'x'; x.innerHTML = '&times;'; x.title = 'Закрыть вкладку (проект останется в библиотеке)';
+      x.onclick = ev => { ev.stopPropagation(); closeTab(t.id, false); };
+      el.appendChild(x);
       box.appendChild(el);
     });
     const add = document.createElement('button'); add.className = 'tabadd'; add.textContent = '+ Новое видео';
-    add.onclick = () => { const n = {id:uid(), name:'Видео '+(c.tabs.length+1)}; c.tabs.push(n); save(); switchTab(n.id); };
+    add.onclick = newProject;
     box.appendChild(add);
+    updNav();
+  }
+  function newProject(){
+    const c = curCh(); const n = {id:uid(), name:'Видео '+(c.tabs.length+1), open:true, updated:Date.now()}; c.tabs.push(n); save();
+    setView('work'); switchTab(n.id);
   }
   function stopAudio(){ au.pause(); }
   function applyState(){
-    // bring audio + UI in line with the current tab state
     stopAudio();
     if(S.audioUrl){ au.src = S.audioUrl; } else { au.removeAttribute('src'); au.load(); }
-    if(S.mode==='rec' || S.mode==='review'){ S.mode = S.starts.length>1 ? 'done' : 'idle'; S.label = S.mode==='done' ? 'Запись приостановлена' : 'Добавьте файлы слева'; }
+    if(S.mode==='review'){ S.mode = S.starts.length>1 ? 'done' : 'idle'; S.label = S.mode==='done' ? 'Запись завершена' : 'Добавьте файлы слева'; }
+    if(S.mode==='rec'){ S.resumePos = S.pos || (S.starts[S.idx]||0); S.label = 'Запись приостановлена · нажмите «Продолжить»'; }
     $('modal').classList.remove('on');
-    $('bPause').textContent = 'Пауза (P)';
-    lastShown = -1;
+    $('bPause').textContent = S.mode==='rec' ? 'Продолжить (P)' : 'Пауза (P)';
+    lastShown = -1; computeWeights();
     renderFiles(); refresh(); setMode(S.mode, S.label);
-    showFrame(0, S.mode==='idle');
+    showFrame(S.mode==='rec' ? S.idx : 0, S.mode==='idle');
+  }
+  function leave(){
+    if(activeId && states[activeId]){ if(S.mode==='rec') S.pos = au.currentTime; stopAudio(); saveProject(activeId); }
   }
   function switchTab(id){
-    const c = curCh(); c.tab = id; save();
-    if(!states[id]) states[id] = newState();
-    S = states[id]; renderTabs(); applyState();
+    const f = findTab(id); if(!f) return;
+    if(id!==activeId) leave();
+    if(f.c.id !== DB.active){ DB.active = f.c.id; renderChannels(); }
+    f.c.tab = id; f.t.open = true; f.t.parked = false; save();
+    S = states[id] || hydrate(id); activeId = id;
+    renderTabs(); applyState();
   }
-  function closeTab(id){
-    const c = curCh(); const st = states[id];
-    if(st && (st.imgs.length || st.audioName) && !confirm('Закрыть вкладку? Загруженные файлы и тайминги в ней пропадут.')) return;
-    const i = c.tabs.findIndex(t => t.id===id);
-    c.tabs.splice(i,1); delete states[id];
-    if(c.tab===id) c.tab = c.tabs[Math.max(0,i-1)].id;
-    save(); switchTab(c.tab);
+  function closeTab(id, park){
+    const f = findTab(id); if(!f) return;
+    const wasActive = id===activeId;
+    const o0 = openTabs(f.c), i = o0.findIndex(t => t.id===id);
+    if(wasActive) leave(); else saveProject(id);
+    f.t.open = false; f.t.parked = !!park; delete states[id];
+    if(!openTabs(f.c).length) ensureTab(f.c);
+    const o1 = openTabs(f.c);
+    if(f.c.tab===id) f.c.tab = (o1[Math.max(0,i-1)] || o1[0]).id;
+    save();
+    if(wasActive){ activeId = null; switchTab(f.c.tab); } else renderTabs();
+    toast(park ? 'Проект отложен. Он в библиотеке.' : 'Вкладка закрыта. Проект сохранён в библиотеке.');
+  }
+  function deleteProject(id){
+    const f = findTab(id); if(!f) return;
+    if(!confirm('Удалить проект «'+(f.t.name||'без названия')+'» навсегда?\nФайлы на вашем компьютере (картинки, озвучка, видео) останутся на месте.')) return;
+    try{ localStorage.removeItem(pKey(id)); }catch(e){}
+    f.c.tabs = f.c.tabs.filter(t => t.id!==id); delete states[id];
+    if(!openTabs(f.c).length) ensureTab(f.c);
+    if(f.c.tab===id) f.c.tab = openTabs(f.c)[0].id;
+    save();
+    if(activeId===id){ activeId = null; stopAudio(); switchTab(curTab().id); }
+    renderTabs(); if(VIEW==='lib') renderLibrary();
+    toast('Проект удалён.');
   }
   function switchChannel(id){
-    DB.active = id; const c = curCh(); save();
-    renderChannels();
-    if(!c.tabs.find(t=>t.id===c.tab)) c.tab = c.tabs[0].id;
-    switchTab(c.tab);
+    leave(); activeId = null;
+    DB.active = id; const c = curCh(); ensureTab(c); save();
+    renderChannels(); switchTab(curTab().id);
   }
   $('chSel').onchange = e => switchChannel(e.target.value);
   $('chAdd').onclick = () => {
-    const t = {id:uid(), name:'Видео 1'};
+    const t = {id:uid(), name:'Видео 1', open:true, updated:Date.now()};
     const c = {id:uid(), name:'Новый канал '+(DB.channels.length+1), sub:'', tabs:[t], tab:t.id};
     DB.channels.push(c); switchChannel(c.id);
-    $('chName').focus(); $('chName').select();
+    setView('work'); $('chName').focus(); $('chName').select();
   };
   $('chDel').onclick = () => {
     if(DB.channels.length < 2) return;
-    if(!confirm('Удалить канал «'+curCh().name+'» со всеми вкладками?')) return;
+    if(!confirm('Удалить канал «'+curCh().name+'» со всеми его проектами?')) return;
     stopAudio();
-    curCh().tabs.forEach(t => delete states[t.id]);
+    curCh().tabs.forEach(t => { delete states[t.id]; try{ localStorage.removeItem(pKey(t.id)); }catch(e){} });
     DB.channels = DB.channels.filter(c => c.id!==DB.active);
-    switchChannel(DB.channels[0].id);
+    activeId = null; switchChannel(DB.channels[0].id);
   };
   $('chName').oninput = e => { curCh().name = e.target.value; const o = $('chSel').selectedOptions[0]; if(o) o.textContent = e.target.value || 'Без названия'; save(); };
   $('chSub').oninput = e => { curCh().sub = e.target.value; save(); };
+  $('bPark').onclick = () => { if(activeId) closeTab(activeId, true); };
+
+  /* ---------- library ---------- */
+  let libFilter = 'all', libChannel = 'all';
+  function statusOf(t, c){
+    const m = t.sum || {};
+    if(t.parked) return {txt:'Отложен', cls:'park', pct:m.n ? m.rec/m.n : 0, line: m.n ? 'Записано '+m.rec+' из '+m.n+' кадров' : 'Пока пусто', grp:'park'};
+    if(m.rendered) return {txt:'Видео собрано', cls:'ok', pct:1, line:'Все '+m.n+' кадров, видео готово', grp:'done'};
+    if(m.mode==='done') return {txt:'Записан', cls:'ok', pct:1, line:'Все '+m.n+' кадров размечены, можно собирать видео', grp:'done'};
+    if(m.mode==='rec') return {txt:'В записи', cls:'rec', pct:m.n ? m.rec/m.n : 0, line:'Остановились на кадре '+m.rec+' из '+m.n, grp:'work'};
+    if(m.n || m.audio) return {txt:'Файлы добавлены', cls:'', pct:0, line:(m.n||0)+' картинок · '+(m.t||0)+' строк', grp:'work'};
+    return {txt:'Новый', cls:'', pct:0, line:'Пока пусто', grp:'work'};
+  }
+  function allProjects(){
+    const out = [];
+    DB.channels.forEach(c => c.tabs.forEach(t => out.push({c, t})));
+    return out.sort((a,b) => (b.t.updated||0) - (a.t.updated||0));
+  }
+  function updNav(){ $('libCnt').textContent = allProjects().length; }
+  function renderLibrary(){
+    // chips
+    const chips = [['all','Все'],['work','В работе'],['done','Готовые'],['park','Отложенные']];
+    $('libChips').innerHTML = '';
+    chips.forEach(([k,l]) => { const b = document.createElement('button'); b.className = 'chip'+(libFilter===k?' on':''); b.textContent = l; b.onclick = () => { libFilter = k; renderLibrary(); }; $('libChips').appendChild(b); });
+    const sel = $('libCh'); sel.innerHTML = '<option value="all">Все каналы</option>';
+    DB.channels.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name || 'Без названия'; sel.appendChild(o); });
+    sel.value = libChannel;
+    const grid = $('libGrid'); grid.innerHTML = '';
+    const list = allProjects().filter(({c,t}) => (libChannel==='all' || c.id===libChannel) && (libFilter==='all' || statusOf(t,c).grp===libFilter));
+    if(!list.length){ grid.innerHTML = '<div class="libempty">Здесь пока ничего нет.<br>Проекты появляются автоматически, как только вы начинаете работу.</div>'; updNav(); return; }
+    list.forEach(({c,t}) => {
+      const st = statusOf(t,c), m = t.sum || {};
+      const el = document.createElement('div'); el.className = 'pcard'+(t.id===activeId?' cur':'');
+      const th = document.createElement('div'); th.className = 'pth';
+      if(NATIVE && m.thumb){ const im = document.createElement('img'); im.src = fileUrl(m.thumb); im.onerror = () => im.remove(); th.appendChild(im); }
+      else th.appendChild(document.createTextNode(m.n ? m.n+' картинок' : 'нет картинок'));
+      const pst = document.createElement('div'); pst.className = 'pst '+st.cls; pst.textContent = st.txt; th.appendChild(pst);
+      const body = document.createElement('div'); body.className = 'pbody';
+      const nm = document.createElement('b'); nm.textContent = t.name || 'Без названия';
+      const s1 = document.createElement('small'); s1.textContent = (c.name||'Канал')+' · '+new Date(t.updated||Date.now()).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+      const s2 = document.createElement('small'); s2.textContent = st.line;
+      const bar = document.createElement('div'); bar.className = 'pbar'; bar.innerHTML = '<i style="width:'+Math.round(st.pct*100)+'%"></i>';
+      body.append(nm, s1, s2, bar);
+      const act = document.createElement('div'); act.className = 'pact';
+      const open = document.createElement('button'); open.className = 'btn primary'; open.textContent = t.parked ? 'Вернуть в работу' : (st.grp==='done' ? 'Открыть' : 'Продолжить');
+      open.onclick = () => { setView('work'); switchTab(t.id); };
+      act.appendChild(open);
+      if(!t.parked){
+        const pk = document.createElement('button'); pk.className = 'btn'; pk.textContent = 'Отложить';
+        pk.onclick = () => { if(t.id===activeId) closeTab(t.id, true); else { saveProject(t.id); t.parked = true; t.open = false; delete states[t.id]; if(!openTabs(c).length) ensureTab(c); save(); renderTabs(); toast('Проект отложен.'); } renderLibrary(); };
+        act.appendChild(pk);
+      }
+      const del = document.createElement('button'); del.className = 'btn del'; del.textContent = 'Удалить'; del.onclick = () => deleteProject(t.id);
+      act.appendChild(del);
+      el.append(th, body, act); grid.appendChild(el);
+    });
+    updNav();
+  }
+  function setView(v){
+    if(v==='lib' && S.mode==='rec' && !au.paused){ au.pause(); S.pos = au.currentTime; $('bPause').textContent = 'Продолжить (P)'; }
+    VIEW = v;
+    $('work').style.display = v==='work' ? 'flex' : 'none';
+    $('lib').style.display = v==='lib' ? 'flex' : 'none';
+    $('navWork').classList.toggle('on', v==='work'); $('navLib').classList.toggle('on', v==='lib');
+    if(v==='lib'){ if(activeId) saveProject(activeId); renderLibrary(); }
+  }
+  $('navWork').onclick = () => setView('work');
+  $('navLib').onclick = () => setView('lib');
+  $('libNew').onclick = newProject;
+  $('libCh').onchange = e => { libChannel = e.target.value; renderLibrary(); };
 
   /* ---------- loading files ---------- */
   function numKey(name){ const m = name.match(/(\d+)(?!.*\d)/); return m ? parseInt(m[1],10) : Infinity; }
@@ -341,15 +548,15 @@
     files.sort((a,b) => { const ka = numKey(a.name), kb = numKey(b.name); return ka!==kb ? ka-kb : a.name.localeCompare(b.name,undefined,{numeric:true}); });
     S.imgs.forEach(i => URL.revokeObjectURL(i.url));
     S.imgs = files.map(f => ({name:f.name, url:URL.createObjectURL(f), path: NATIVE ? NATIVE.pathFor(f) : ''}));
-    renderFiles(); refresh();
+    renderFiles(); refresh(); touch();
   }
   function loadAudio(f){
     if(!f) return;
     if(S.audioUrl) URL.revokeObjectURL(S.audioUrl);
     S.audioUrl = URL.createObjectURL(f); S.audioName = f.name; S.audioPath = NATIVE ? NATIVE.pathFor(f) : ''; S.dur = 0;
-    au.src = S.audioUrl; renderFiles();
+    au.src = S.audioUrl; renderFiles(); touch();
   }
-  au.addEventListener('loadedmetadata', () => { S.dur = au.duration; renderFiles(); refresh(); });
+  au.addEventListener('loadedmetadata', () => { S.dur = au.duration; if(S.resumePos!=null){ try{ au.currentTime = S.resumePos; }catch(e){} S.resumePos = null; } renderFiles(); refresh(); touch(); });
   au.addEventListener('error', () => { if(!au.getAttribute('src')) return; $('sAud').textContent = 'Не удалось прочитать звук'; $('dAud').classList.remove('ok'); });
 
   function loadText(f){
@@ -369,7 +576,7 @@
         out.push(l);
       }
       S.lines = out; S.txtName = f.name; computeWeights();
-      renderFiles(); refresh();
+      renderFiles(); refresh(); touch();
     };
     r.readAsText(f,'utf-8');
   }
@@ -408,8 +615,9 @@
     $('stT').classList.toggle('bad', ni && nt && ni!==nt);
     let m = '';
     if(ni && nt && ni!==nt) m = 'Картинок '+ni+', строк '+nt+'. Количество не совпадает — лишнее останется без текста/картинки.';
+    if(S.missing) m = 'Сохранённые файлы не найдены (перемещены или удалены). Добавьте их заново: тайминги сохранены.';
     $('msg').textContent = m;
-    $('start').disabled = !(ni && S.dur) || S.mode==='rec';
+    updStart();
     if(S.mode==='idle') showFrame(0,true);
   }
 
@@ -485,29 +693,32 @@
     $('bPause').disabled = !(rec||rev);
     $('bReview').disabled = !(S.starts.length && !rec);
     $('bExport').disabled = !(S.starts.length && !rec);
-    $('start').disabled = rec || !(S.imgs.length && S.dur);
+    updStart(); touch();
   }
+  function updStart(){ $('start').disabled = !(S.imgs.length && S.dur) || (S.mode==='rec' && !au.paused); }
+  au.addEventListener('play', updStart); au.addEventListener('pause', updStart);
 
   /* ---------- recording ---------- */
   function startRec(){
     if(!S.imgs.length || !S.dur) return;
     au.pause(); au.currentTime = 0; au.playbackRate = parseFloat($('rate').value);
-    S.starts = [0]; S.idx = 0; computeWeights();
+    S.starts = [0]; S.idx = 0; S.rendered = false; S.pos = 0; computeWeights();
     setMode('rec','Идёт запись · слушайте и жмите Пробел, когда фраза кадра закончилась');
     showFrame(0); au.play();
   }
   function next(){
     if(S.mode!=='rec') return;
+    if(au.paused){ au.play(); $('bPause').textContent = 'Пауза (P)'; $('modeLbl').textContent = 'Идёт запись · слушайте и жмите Пробел, когда фраза кадра закончилась'; return; }
     if(S.idx >= S.imgs.length-1){ finish(); return; }
     S.idx++; S.starts[S.idx] = au.currentTime;
-    showFrame(S.idx);
+    showFrame(S.idx); touch();
   }
   function back(){
     if(S.mode!=='rec' || S.idx===0) return;
     S.starts.length = S.idx;        // forget start of the current frame
     S.idx--;
     if($('rew').checked) au.currentTime = S.starts[S.idx];
-    showFrame(S.idx);
+    showFrame(S.idx); touch();
   }
   function finish(){
     au.pause();
@@ -516,7 +727,7 @@
     $('modal').classList.add('on');
   }
   function togglePause(){
-    if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? 'Продолжить (P)' : 'Пауза (P)'; }
+    if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? 'Продолжить (P)' : 'Пауза (P)'; if(S.mode==='rec'){ S.pos = au.currentTime; touch(); } }
   }
   au.addEventListener('ended', () => { if(S.mode==='rec' && au.currentTime > 0) S.dur = Math.max(S.dur, au.currentTime); if(S.mode==='rec') finish(); else if(S.mode==='review') setMode('done','Просмотр завершён'); });
 
@@ -606,7 +817,7 @@
       $('eRender').disabled = true;
       const r = await NATIVE.render({frames, audioPath:S.audioPath});
       $('eRender').disabled = false;
-      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out; NATIVE.showItem(r.out); }
+      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out; NATIVE.showItem(r.out); S.rendered = true; if(activeId) saveProject(activeId); }
       else if(r.cancelled){ $('rwrap').style.display='none'; }
       else { $('rtxt').textContent = r.error==='cancelled' ? 'Отменено' : 'Ошибка: '+r.error; }
     };
@@ -623,8 +834,10 @@
 
   document.addEventListener('keydown', e => {
     const tag = (e.target.tagName||'').toLowerCase();
+    if(VIEW==='lib' && !(e.code==='KeyF')) return;
     if(tag==='select' && e.code==='Space') return;
     if(tag==='textarea' || (tag==='input' && e.target.type==='text')) return;
+    if($('resume').classList.contains('on')) return;
     if($('modal').classList.contains('on')){ if(e.key==='Escape') $('modal').classList.remove('on'); return; }
     if(e.code==='Space'){ e.preventDefault(); if(S.mode==='rec') next(); }
     else if(e.code==='ArrowLeft' || e.code==='Backspace'){ e.preventDefault(); back(); }
@@ -637,8 +850,19 @@
   Object.defineProperty(window,'__autocut',{get:()=>S}); // for debugging
   if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; }).catch(()=>{});
   load(); renderChannels();
-  { const c = curCh(); const t = curTab(); c.tab = t.id; states[t.id] = S; renderTabs(); }
-  renderFiles(); refresh(); setMode('idle','Добавьте файлы слева');
+  { const c = curCh(); const t = curTab(); c.tab = t.id; activeId = t.id; S = hydrate(t.id); renderTabs(); applyState(); }
+  // returning to an unfinished recording: offer to continue, postpone or delete
+  function askResume(){
+    if(S.mode!=='rec') return;
+    const f = findTab(activeId);
+    $('rInfo').textContent = 'Проект «'+(f ? f.t.name : '')+'»: вы остановились на кадре '+(S.idx+1)+' из '+S.imgs.length+'. Что сделать?';
+    $('resume').classList.add('on');
+  }
+  $('rGo').onclick = () => { $('resume').classList.remove('on'); if(au.paused) togglePause(); };
+  $('rLater').onclick = () => $('resume').classList.remove('on');
+  $('rPark').onclick = () => { $('resume').classList.remove('on'); closeTab(activeId, true); };
+  $('rDel').onclick = () => { $('resume').classList.remove('on'); deleteProject(activeId); };
+  askResume();
 })();
 </script>
 </body>
