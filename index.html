@@ -470,7 +470,9 @@
   }
   function allProjects(){
     const out = [];
-    DB.channels.forEach(c => c.tabs.forEach(t => out.push({c, t})));
+    // untouched empty placeholders are not shown: there is nothing in them to keep
+    const empty = t => { const m = t.sum || {}; return !(m.n || m.audio || m.t || m.rec); };
+    DB.channels.forEach(c => c.tabs.forEach(t => { if(!empty(t) || t.parked) out.push({c, t}); }));
     return out.sort((a,b) => (b.t.updated||0) - (a.t.updated||0));
   }
   function updNav(){ $('libCnt').textContent = allProjects().length; }
@@ -484,7 +486,7 @@
     sel.value = libChannel;
     const grid = $('libGrid'); grid.innerHTML = '';
     const list = allProjects().filter(({c,t}) => (libChannel==='all' || c.id===libChannel) && (libFilter==='all' || statusOf(t,c).grp===libFilter));
-    if(!list.length){ grid.innerHTML = '<div class="libempty">Здесь пока ничего нет.<br>Проекты появляются автоматически, как только вы начинаете работу.</div>'; updNav(); return; }
+    if(!list.length){ grid.innerHTML = '<div class="libempty">Здесь пока ничего нет.<br>Проект появится здесь, как только вы добавите в него файлы.</div>'; updNav(); return; }
     list.forEach(({c,t}) => {
       const st = statusOf(t,c), m = t.sum || {};
       const el = document.createElement('div'); el.className = 'pcard'+(t.id===activeId?' cur':'');
