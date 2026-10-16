@@ -419,6 +419,11 @@
     </div>
     <div class="prog"><div id="gBar"></div></div>
     <div class="hint" id="gStat" style="margin:6px 0">Готово: 0</div>
+    <div id="gMiss" style="display:none;margin:8px 0;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--panel2)">
+      <div class="row" style="margin-bottom:6px;flex-wrap:wrap"><b id="gMissT" style="flex:1;font-size:13px"></b><button class="btn" id="gMissCopy" style="width:auto;margin:0;padding:6px 10px;font-size:12.5px">Скопировать все промты</button></div>
+      <div id="gMissL" style="max-height:150px;overflow:auto;display:grid;gap:6px"></div>
+      <div class="hint" style="margin:6px 0 0">Сделайте эти картинки в Gemini вручную и нажмите «Выбрать файл» у нужной сцены: картинка встанет ровно на своё место. Можно и просто положить файл с именем image_НОМЕР.png в папку проекта.</div>
+    </div>
     <div id="gLog" style="height:120px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;font:12px/1.5 monospace;color:var(--dim);background:var(--panel2)"></div>
     <div class="hint" id="gDir" style="margin:6px 0 8px"></div>
     <button class="btn" id="gClose">Закрыть</button>
@@ -449,7 +454,7 @@
   const TRD = () => ({on:false, every:'1', dur:'0.4', fin:false, fout:false});
   const SBD = () => ({burn:false, srt:false, hl:true, size:'56'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
-  const GND = () => ({text:'', dir:'', key:''});
+  const GND = () => ({text:'', dir:'', key:'', manual:{}});
   const newState = () => ({fx:FXD(), tr:TRD(), sb:SBD(), mu:MUD(), gen:GND(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
@@ -603,7 +608,7 @@
     port: 9222, url: (() => { try{ return localStorage.getItem('autocut.genurl') || 'https://gemini.google.com/app'; }catch(e){ return 'https://gemini.google.com/app'; } })(),
     input: ["rich-textarea div[role='textbox']", "div[contenteditable='true'][role='textbox']", "div.ql-editor"],
     dlRe: /download|скачать|завантажити/i,
-    waitImage: 240000, waitDownload: 60000, tries: 2
+    waitImage: (() => { try{ return parseInt(localStorage.getItem('autocut.genwait'),10) || 150000; }catch(e){ return 150000; } })(), waitDownload: 60000, passes: 4
   };
   const gsleep = ms => new Promise(r => setTimeout(r, ms));
   class Cdp {
@@ -625,12 +630,30 @@
   }
   async function doneSet(){
     const names = await NATIVE.gen.ls(G.dir || await genDirFor()), set = new Set();
-    names.forEach(n => { const m = n.match(/^image_(\d+)\.png$/); if(m) set.add(+m[1]); }); return set;
+    names.forEach(n => { const m = n.match(/^image_(\d+)\.png$/); if(m) set.add(+m[1]); });
+    Object.keys(S.gen.manual||{}).forEach(k => set.add(+k)); return set;
   }
-  async function genStat(){
-    const total = parsePrompts($('gPrompts').value).length, ok = (await doneSet()).size;
+  async function genStat(final){
+    const prompts = parsePrompts($('gPrompts').value), total = prompts.length, done = await doneSet();
+    let ok = 0; for(let n = 1; n <= total; n++) if(done.has(n)) ok++;
     $('gCount').textContent = 'Сцен: '+total; $('gStat').textContent = 'Готово: '+ok+(total ? ' из '+total : '');
-    $('gBar').style.width = (total ? Math.min(100, ok/total*100) : 0)+'%'; return {total, ok};
+    $('gBar').style.width = (total ? Math.min(100, ok/total*100) : 0)+'%';
+    const miss = []; for(let n = 1; n <= total; n++) if(!done.has(n)) miss.push(n);
+    const box = $('gMiss');
+    if(miss.length && (final || (!G.run && ok > 0))){
+      box.style.display = ''; $('gMissT').textContent = 'Не получились сцены ('+miss.length+'): '+miss.join(', ');
+      const list = $('gMissL'); list.innerHTML = '';
+      miss.forEach(n => {
+        const row = document.createElement('div'); row.className = 'row'; row.style.cssText = 'gap:6px;align-items:flex-start';
+        const t = document.createElement('div'); t.style.cssText = 'flex:1;font-size:12.5px;color:var(--dim);min-width:0'; t.textContent = n+'. '+prompts[n-1].slice(0,110)+'…';
+        const lb = document.createElement('label'); lb.className = 'btn'; lb.style.cssText = 'width:auto;margin:0;padding:5px 9px;font-size:12px;cursor:pointer;white-space:nowrap'; lb.textContent = 'Выбрать файл';
+        const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+        inp.onchange = () => { const f = inp.files[0]; if(!f) return; const pth = NATIVE.pathFor(f); if(!pth){ toast('Не удалось получить путь к файлу'); return; }
+          S.gen.manual[n] = pth; touch(); glog('Сцена '+n+': добавлена вручную ('+f.name+')'); genStat(true); };
+        lb.appendChild(inp); row.append(t, lb); list.appendChild(row);
+      });
+    } else box.style.display = 'none';
+    return {total, ok, miss};
   }
   async function genConnect(){
     if(G.cdp && G.cdp.ws.readyState === 1) return;
@@ -693,30 +716,41 @@
       await genDirFor(); G.tmp = await NATIVE.gen.tmp(); await genConnect();
       await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath: G.tmp, eventsEnabled:true});
       const delay = parseInt($('gDelay').value,10) || 5; let fails = 0;
-      for(let n = 1; n <= prompts.length && !dead(); n++){
-        if((await doneSet()).has(n)) continue;
-        glog('Сцена '+n+' из '+prompts.length+': '+prompts[n-1].slice(0,50)+'…');
-        let okk = false, lastErr = '';
-        for(let k = 1; k <= GEN.tries && !okk && !dead(); k++){
-          try{ await genScene(n, prompts[n-1], tok); okk = true; glog('  сохранено '+imgName(n)); }
-          catch(e){ lastErr = e.message; if(dead()) break; glog('  ошибка: '+e.message+(k<GEN.tries ? ' — пробую ещё раз' : '')); await gsleep(3000); }
+      for(let pass = 1; pass <= GEN.passes && !dead(); pass++){
+        const left = []; const dn = await doneSet(); for(let n = 1; n <= prompts.length; n++) if(!dn.has(n)) left.push(n);
+        if(!left.length) break;
+        glog('Круг '+pass+' из '+GEN.passes+': сцен в работе '+left.length);
+        for(const n of left){
+          if(dead()) break;
+          glog('Сцена '+n+' из '+prompts.length+': '+prompts[n-1].slice(0,50)+'…');
+          try{ await genScene(n, prompts[n-1], tok); glog('  сохранено '+imgName(n)); fails = 0; }
+          catch(e){ if(dead()) break; fails++; glog('  не получилось: '+e.message+' (вернусь к ней в следующем круге)'); await gsleep(3000);
+            if(fails >= 6 && /не найдено поле|Chrome/.test(e.message)){ glog('Слишком много ошибок подряд: проверьте окно Chrome и вход в Google. Останавливаюсь.'); G.tok++; break; } }
+          await genStat();
+          if(!dead()) await gsleep((delay + Math.random()*delay)*1000);
         }
-        if(!okk && !dead()){ fails++; glog('  сцена '+n+' пропущена'); if(fails >= 5 && /лимит|не найдено поле|Chrome/.test(lastErr)){ glog('Слишком много ошибок подряд, останавливаюсь.'); break; } } else fails = 0;
-        await genStat();
-        if(!dead()) await gsleep((delay + Math.random()*delay)*1000);
+        if(dead()) break;
       }
-      const st = await genStat();
-      if(!dead()) glog((st.ok >= st.total ? 'Готово! Нажмите «Добавить в проект».' : 'Завершено, но не все сцены готовы. Нажмите «Старт» ещё раз: сделанные пропустятся.'));
+      const st = await genStat(true);
+      glog(st.miss.length ? 'Готово не всё. Не получились сцены: '+st.miss.join(', ')+'. Список с промтами показан ниже.' : 'Готово! Нажмите «Добавить в проект».');
     }catch(e){ if(!dead()) glog('Ошибка: '+e.message); }
     if(dead()) return;                       // the Stop button already reset everything
     G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none';
   }
   async function genUse(){
-    const dir = await genDirFor(), names = (await NATIVE.gen.ls(dir)).map(n => n.match(/^image_(\d+)\.png$/)).filter(Boolean).sort((a,b) => a[1]-b[1]);
-    if(!names.length){ toast('Пока нет готовых картинок'); return; }
+    const dir = await genDirFor(), have = new Set((await NATIVE.gen.ls(dir)).map(n => (n.match(/^image_(\d+)\.png$/)||[])[1]).filter(Boolean).map(Number));
+    const total = parsePrompts($('gPrompts').value).length || Math.max(0, ...have, ...Object.keys(S.gen.manual||{}).map(Number));
+    const imgs = [], miss = [];
+    for(let n = 1; n <= total; n++){
+      const man = S.gen.manual && S.gen.manual[n];
+      if(have.has(n)){ const pth = dir+G.sep+imgName(n); imgs.push({name:imgName(n), path:pth, url:fileUrl(pth)}); }
+      else if(man){ const nm = String(man).split(/[\\/]/).pop(); imgs.push({name:nm, path:man, url:fileUrl(man)}); }
+      else miss.push(n);
+    }
+    if(!imgs.length){ toast('Пока нет готовых картинок'); return; }
+    if(miss.length && !confirm('Не хватает картинок для сцен: '+miss.join(', ')+'.\nЕсли добавить сейчас, картинки после пропусков сдвинутся относительно текста.\n\nДобавить всё равно?')) return;
     S.imgs.forEach(i => { if(i.url && i.url.startsWith('blob:')) URL.revokeObjectURL(i.url); });
-    S.imgs = names.map(m => ({name:m[0], path:dir+G.sep+m[0], url:fileUrl(dir+G.sep+m[0])}));
-    renderFiles(); refresh(); touch(); $('genModal').classList.remove('on'); toast('Картинок добавлено в проект: '+S.imgs.length);
+    S.imgs = imgs; renderFiles(); refresh(); touch(); $('genModal').classList.remove('on'); toast('Картинок добавлено в проект: '+S.imgs.length);
   }
   if(NATIVE){
     $('genOpen').style.display = '';
@@ -727,6 +761,7 @@
     $('gPrompts').oninput = () => { S.gen.text = $('gPrompts').value; touch(); genStat(); };
     $('gFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; $('gPrompts').value = await f.text(); S.gen.text = $('gPrompts').value; touch(); genStat(); };
     $('gLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:GEN.url}); glog(r.ok ? 'Chrome запущен. Войдите в Google, если нужно, и нажмите «Старт».' : 'Ошибка: '+r.error); };
+    $('gMissCopy').onclick = async () => { const pr = parsePrompts($('gPrompts').value), d = await doneSet(); const txt = pr.map((p,i) => d.has(i+1) ? null : (i+1)+'. '+p).filter(Boolean).join('\n\n'); try{ await navigator.clipboard.writeText(txt); toast('Промты скопированы'); }catch(e){ $('gPrompts').value = txt; toast('Не удалось скопировать, промты показаны в поле'); } };
     $('gStart').onclick = genStart; $('gStop').onclick = () => { G.tok++; G.stop = true; try{ if(G.cdp) G.cdp.ws.close(); }catch(e){} G.cdp = null; G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none'; glog('Остановлено. Сделанные картинки сохранены, «Старт» продолжит с места остановки.'); genStat(); };
     $('gUse').onclick = genUse; $('gClose').onclick = () => $('genModal').classList.remove('on');
   }
@@ -762,7 +797,7 @@
   function serialize(st){
     return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, sb:st.sb, mu:st.mu, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key}};
+            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, sb:st.sb, mu:st.mu, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -784,7 +819,7 @@
     const st = newState(); states[id] = st;
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d) return st;
-    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.gen = Object.assign(GND(), d.gen || {});
+    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
