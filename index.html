@@ -518,7 +518,7 @@
   function togglePause(){
     if(S.mode==='rec' || S.mode==='review'){ au.paused ? au.play() : au.pause(); $('bPause').textContent = au.paused ? 'Продолжить (P)' : 'Пауза (P)'; }
   }
-  au.addEventListener('ended', () => { if(S.mode==='rec') finish(); else if(S.mode==='review') setMode('done','Просмотр завершён'); });
+  au.addEventListener('ended', () => { if(S.mode==='rec' && au.currentTime > 0) S.dur = Math.max(S.dur, au.currentTime); if(S.mode==='rec') finish(); else if(S.mode==='review') setMode('done','Просмотр завершён'); });
 
   /* ---------- review ---------- */
   function review(){
