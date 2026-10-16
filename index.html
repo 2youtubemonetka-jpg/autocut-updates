@@ -850,7 +850,7 @@
   document.addEventListener('click', e => { if(e.target.closest('button') && !e.target.closest('.modal')) e.target.closest('button').blur(); });
 
   Object.defineProperty(window,'__autocut',{get:()=>S}); // for debugging
-  if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; }).catch(()=>{});
+  if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; try{ const last = localStorage.getItem('autocut.lastver'); if(last && last!==i.version) setTimeout(() => toast('Программа обновлена до v'+i.version), 600); localStorage.setItem('autocut.lastver', i.version); }catch(e){} }).catch(()=>{});
   load(); renderChannels();
   { const c = curCh(); const t = curTab(); c.tab = t.id; activeId = t.id; S = hydrate(t.id); renderTabs(); applyState(); }
   // returning to an unfinished recording: offer to continue, postpone or delete
