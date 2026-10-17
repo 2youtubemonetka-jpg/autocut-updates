@@ -249,6 +249,14 @@
   @media (max-width:820px){ .thgrid{grid-template-columns:1fr} }
   /* scene sounds */
   .sxlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:10px}
+  .sndstrip{margin:8px 0 0;border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:8px}
+  .sndstrip .sh{display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:12.5px;color:var(--dim)}
+  .sndchips{display:flex;flex-wrap:wrap;gap:6px;max-height:112px;overflow:auto}
+  .sndchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font-size:12.5px;cursor:grab;user-select:none}
+  .sndchip:active{cursor:grabbing}
+  .sndchip i{font-style:normal;opacity:.7;cursor:pointer}
+  .sndchip.own{border-color:var(--accent)}
+  .tlwrap.drop{outline:2px dashed var(--accent);outline-offset:-2px}
   .sxi{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:6px 8px;font-size:13px;cursor:pointer;user-select:none}
   .sxi b{flex:1;font-weight:500}
   .sxi.on{border-color:var(--accent);background:var(--tint)}
@@ -286,6 +294,7 @@
         </div>
         <input id="chName" class="chname" placeholder="Название канала" maxlength="60" spellcheck="false">
         <input id="chSub" class="chsub" placeholder="Описание (необязательно)" maxlength="90" spellcheck="false">
+        <button class="btn" id="wmOpen" style="width:100%;margin-top:6px" title="Логотип или название канала в углу всех видео">Водяной знак канала</button>
         <button class="btn" id="beOpen" style="width:100%;margin-top:6px" title="Картинка или ролик в начале и в конце каждого видео канала">Заставка и концовка</button>
       </div>
     </div>
@@ -343,6 +352,21 @@
     </div>
 
     <div class="sec">
+      <h4>Титры частей</h4>
+      <div class="fxbox">
+        <label class="chk"><input type="checkbox" id="ctOn"> Показывать название части на экране</label>
+        <div id="ctopts" class="off">
+          <div class="row"><span>Где</span>
+            <select id="ctPos"><option value="bl">Слева внизу</option><option value="c">По центру</option><option value="tl">Слева вверху</option></select></div>
+          <div class="row"><span>Сколько секунд</span>
+            <select id="ctDur"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
+          <label class="chk"><input type="checkbox" id="ctSkip"> Не показывать для первой главы</label>
+          <div class="hint" style="margin:0">Берутся названия глав, которые вы отметили в редакторе кнопкой «Глава» (те же, что идут в описание YouTube). Показываются коротким титром в начале каждой главы. Только в полной сборке.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
       <h4>Плёнка</h4>
       <div class="fxbox">
         <label class="chk"><input type="checkbox" id="fiOn"> Зерно, виньетка и тряска камеры</label>
@@ -352,7 +376,7 @@
           <div class="row"><span>Виньетка</span>
             <select id="fiVig"><option value="0">Нет</option><option value="1">Лёгкая</option><option value="2">Сильная</option></select></div>
           <div class="row"><span>Тряска камеры</span>
-            <select id="fiShake"><option value="0">Нет</option><option value="1">Лёгкая</option><option value="2">Сильная</option></select></div>
+            <select id="fiShake"><option value="0">Нет</option><option value="1">Едва заметная</option><option value="2">Очень слабая</option><option value="3">Слабая</option><option value="4">Средняя</option><option value="5">Сильная</option></select></div>
           <div class="row"><span>Тон</span>
             <select id="fiTone"><option value="none">Как есть</option><option value="dark">Мрачный</option><option value="warm">Тёплый</option><option value="cold">Холодный</option></select></div>
           <label class="chk"><input type="checkbox" id="fiFlash"> Вспышка на кадрах со звуком</label>
@@ -438,6 +462,8 @@
       <h4>Готовое видео</h4>
       <div class="tools">
         <button class="btn full" id="pfOpen" title="Найти проблемы до сборки: пропавшие файлы, длинные строки, звук короче разметки">Проверить проект</button>
+        <button class="btn" id="hsOpen" title="Автоматические сохранения перед крупными действиями, можно вернуться назад">История версий</button>
+        <button class="btn full" id="pkOpen" title="Папка для загрузки на YouTube: обложка, название, описание с главами, теги, источники">Пакет для загрузки</button>
         <button class="btn" id="thOpen" title="Обложка 1280x720 из кадра видео с крупным текстом">Обложка</button>
         <button class="btn" id="chOpen" title="Список глав с временем для описания на YouTube">Главы</button>
         <button class="btn" id="fdOpen" title="Перейти к кадру по номеру или найти по тексту (Ctrl+F)">Поиск кадра</button>
@@ -500,6 +526,10 @@
       </div>
       <div class="tlwrap" id="tlwrap"><canvas id="tl"></canvas></div>
       <input type="range" class="edscroll" id="tlScroll" min="0" max="1000" value="0">
+      <div class="sndstrip" id="sndStrip">
+        <div class="sh"><b style="color:var(--text)">Звуки</b><span>Перетащите звук на нужный кадр на шкале. Нажатие на звук проигрывает его.</span><span style="flex:1"></span><button class="edb" id="sndAdd" title="Добавить свои звуки (mp3, wav) в библиотеку">+ Свои звуки</button><input type="file" id="sndFile" accept="audio/*,.mp3,.wav,.ogg,.m4a" multiple style="display:none"></div>
+        <div class="sndchips" id="sndChips"></div>
+      </div>
       <div class="edtools">
         <div class="edrow"><span class="lbl">Граница слева</span>
           <button class="edb" data-nl="-0.5">-0.5</button><button class="edb" data-nl="-0.1">-0.1</button><button class="edb" data-nl="0.1">+0.1</button><button class="edb" data-nl="0.5">+0.5</button>
@@ -634,7 +664,7 @@
       <div class="throw"><span>Наклон</span><select id="thTilt" class="inp"><option value="0">Нет</option><option value="-4">Влево</option><option value="4">Вправо</option></select></div>
       <div class="throw"><span>Затемнение</span><select id="thDim" class="inp"><option value="0">Нет</option><option value="0.45">Лёгкое</option><option value="0.75">Сильное</option></select></div>
       <div class="throw"><span>Приближение</span><input type="range" id="thZoom" min="100" max="250" value="100"></div>
-      <div class="btns"><button class="btn primary" id="thSave">Сохранить обложку</button><button class="btn" id="thSaveAs" style="display:none">В другую папку…</button><button class="btn" id="thStyleSave" title="Цвета, плашка, положение и размер текста будут сразу у обложек всех новых видео этого канала">Запомнить стиль для канала</button></div>
+      <div class="btns"><button class="btn primary" id="thSave">Сохранить обложку</button><button class="btn" id="thSaveAs" style="display:none">В другую папку…</button><button class="btn" id="thFeed" title="Как обложка и название выглядят в ленте YouTube на телефоне и на компьютере">Как в ленте</button><button class="btn" id="thStyleSave" title="Цвета, плашка, положение и размер текста будут сразу у обложек всех новых видео этого канала">Запомнить стиль для канала</button></div>
       <div class="hint" id="thMsg" style="margin:0 0 8px;min-height:18px">Сохраняется в JPG 1280x720 до 2 МБ, как требует YouTube.</div>
       <button class="btn" id="thClose">Закрыть</button>
     </div>
@@ -733,6 +763,46 @@
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span>Строгость</span><input type="range" id="simTh" min="50" max="95" value="75"><b id="simThV">75%</b></div>
   <div id="simList" style="max-height:48vh;overflow:auto;display:grid;gap:8px"></div>
   <div class="btns"><button class="btn" id="simClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="feedModal" style="z-index:30"><div class="card wide">
+  <h2>Как это выглядит в ленте</h2>
+  <p class="hint" style="margin:0 0 8px">Обложка в трёх размерах: телефон, компьютер и боковая лента «Похожие». Если текст на самой маленькой не читается, сделайте его крупнее или короче.</p>
+  <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap"><input id="fdTitle" class="inp" maxlength="100" spellcheck="false" placeholder="Название видео" style="flex:1;min-width:240px;margin:0"><select id="fdTheme" class="inp" style="width:auto;margin:0"><option value="dark">Тёмная тема</option><option value="light">Светлая тема</option></select></div>
+  <canvas id="feedCv" width="1100" height="340" style="width:100%;height:auto;border-radius:10px;border:1px solid var(--line)"></canvas>
+  <div class="btns"><button class="btn" id="feedClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="hsModal"><div class="card mid">
+  <h2>История версий проекта</h2>
+  <p class="hint" style="margin:0 0 8px">Программа сама сохраняет версию перед авторазметкой, разметкой по речи и сокращением пауз. Можно сохранить версию и вручную. Хранятся последние 8. Откат возвращает разметку, текст, картинки, звуки и настройки проекта (сами файлы на диске не трогаются).</p>
+  <div id="hsList" style="max-height:44vh;overflow:auto;display:grid;gap:6px;margin-bottom:10px"></div>
+  <div class="btns"><button class="btn primary" id="hsSave">Сохранить версию сейчас</button><button class="btn" id="hsClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="pkModal"><div class="card mid">
+  <h2>Пакет для загрузки на YouTube</h2>
+  <p class="hint" style="margin:0 0 8px">Одной кнопкой создаст папку рядом с готовым видео: обложка, название, описание с главами и источниками, теги и памятка. Видео остаётся там же, где вы его сохранили.</p>
+  <label class="fl" for="pkTitle">Название видео</label>
+  <input id="pkTitle" class="inp" maxlength="100" spellcheck="false" placeholder="Название для YouTube">
+  <label class="fl" for="pkTags">Теги, через запятую</label>
+  <textarea id="pkTags" class="inp" rows="2" spellcheck="false" placeholder="fire safety, Chicago 1903, history"></textarea>
+  <label class="fl" for="pkSrc">Источники, по одному на строку (название и ссылка)</label>
+  <textarea id="pkSrc" class="inp" rows="4" spellcheck="false" placeholder="Chicago Tribune, Dec 31 1903&#10;Iroquois Theatre fire, Wikipedia"></textarea>
+  <label class="chk" style="margin:6px 0"><input type="checkbox" id="pkAi"> Добавить в описание пометку, что картинки и озвучка сделаны ИИ</label>
+  <input id="pkAiTxt" class="inp" maxlength="200" spellcheck="false">
+  <div class="hint" id="pkMsg" style="margin:8px 0"></div>
+  <div class="btns"><button class="btn primary" id="pkGo">Создать пакет</button><button class="btn" id="pkClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="wmModal"><div class="card mid">
+  <h2>Водяной знак канала</h2>
+  <p class="hint" style="margin:0 0 8px">Логотип или название в углу всех видео этого канала. Добавляется при полной сборке, в пробный просмотр не добавляется.</p>
+  <label style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" id="wmOn"> Добавлять при сборке</label>
+  <div class="throw"><span>Что показывать</span><select id="wmKind" class="inp"><option value="text">Текст (название канала)</option><option value="image">Картинка (логотип)</option></select></div>
+  <div class="throw" id="wmTextRow"><span>Текст</span><input id="wmText" class="inp" maxlength="40" spellcheck="false" placeholder="Rules Written In Blood"></div>
+  <div class="throw" id="wmImgRow" style="display:none"><span>Файл</span><span style="display:flex;gap:6px;align-items:center"><button class="btn" id="wmPick">Выбрать…</button><span id="wmImgName" class="hint" style="margin:0"></span></span><input type="file" id="wmFile" accept="image/*" style="display:none"></div>
+  <div class="throw"><span>Угол</span><select id="wmPos" class="inp"><option value="br">Справа внизу</option><option value="bl">Слева внизу</option><option value="tr">Справа вверху</option><option value="tl">Слева вверху</option></select></div>
+  <div class="throw"><span>Размер</span><input type="range" id="wmSize" min="5" max="30" value="12"></div>
+  <div class="throw"><span>Прозрачность</span><input type="range" id="wmOp" min="10" max="100" value="70"></div>
+  <canvas id="wmCv" width="640" height="360" style="width:100%;border-radius:10px;border:1px solid var(--line);margin-top:6px;background:#1b1b24"></canvas>
+  <div class="btns"><button class="btn primary" id="wmClose">Готово</button></div>
 </div></div>
 <div class="modal" id="beModal"><div class="card mid">
   <h2>Заставка и концовка канала</h2>
@@ -877,12 +947,15 @@
   const FXD = () => ({on:false, every:'1', kinds:['lr','rl','in','out'], order:'cycle', power:'mid'});
   const TRD = () => ({on:false, every:'1', dur:'0.4', fin:false, fout:false});
   const SBD = () => ({burn:false, srt:false, hl:true, size:'56', mode:'line', col:'red', caps:false});
-  const FLD = () => ({on:false, grain:'1', vig:'1', shake:'0', tone:'none', flash:false});
+  const FLD = () => ({on:false, grain:'1', vig:'1', shake:'0', tone:'none', flash:false, sv:2});
+  // shake used to have two levels (1 and 2); old values are moved to the same strength on the new five-step scale
+  const filmFix = f => { const old = !f || !(f.sv >= 2); f = Object.assign(FLD(), f || {}); if(old){ if(String(f.shake)==='1') f.shake = '4'; else if(String(f.shake)==='2') f.shake = '5'; f.sv = 2; } return f; };
   const AUD = () => ({norm:false});
+  const CTD = () => ({on:false, dur:3, pos:'bl', skip:true});
   const QD = () => ({res:'1080', q:'normal', hw:'auto'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
   const GND = () => ({text:'', dir:'', key:'', manual:{}});
-  const newState = () => ({lang:'', fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), film:FLD(), au:AUD(), gen:GND(), meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const newState = () => ({lang:'', fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), film:FLD(), au:AUD(), ct:CTD(), gen:GND(), meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -969,7 +1042,7 @@
     $('trIn').checked = !!t.fin; $('trOut').checked = !!t.fout;
     $('sbBurn').checked = !!b.burn; $('sbopts').classList.toggle('off', !b.burn); $('sbHl').checked = !!b.hl; $('sbSize').value = b.size; $('sbSrt').checked = !!b.srt; $('sbMode').value = b.mode || 'line'; $('sbCol').value = b.col || 'red'; $('sbCaps').checked = !!b.caps; $('sbMode').disabled = !b.hl; if(typeof sbInfoUpd==='function') sbInfoUpd();
     $('muName').textContent = m.name || 'Трек не выбран'; $('muDel').style.display = m.path ? '' : 'none';
-    const fl = S.film || (S.film = FLD()); $('fiOn').checked = !!fl.on; $('fiopts').classList.toggle('off', !fl.on); $('fiGrain').value = fl.grain; $('fiVig').value = fl.vig; $('fiShake').value = fl.shake; $('fiTone').value = fl.tone; $('fiFlash').checked = !!fl.flash; $('stage').classList.toggle('film-vig', !!fl.on && +fl.vig > 0); $('auNorm').checked = !!(S.au && S.au.norm); if(typeof renderLang==='function') renderLang(); if(typeof hwInfoUpd==='function') hwInfoUpd();
+    const fl = S.film || (S.film = FLD()); $('fiOn').checked = !!fl.on; ctSync(); $('fiopts').classList.toggle('off', !fl.on); $('fiGrain').value = fl.grain; $('fiVig').value = fl.vig; $('fiShake').value = fl.shake; $('fiTone').value = fl.tone; $('fiFlash').checked = !!fl.flash; $('stage').classList.toggle('film-vig', !!fl.on && +fl.vig > 0); $('auNorm').checked = !!(S.au && S.au.norm); if(typeof renderLang==='function') renderLang(); if(typeof hwInfoUpd==='function') hwInfoUpd();
     $('muopts').classList.toggle('off', !m.path); $('muVol').value = m.vol; $('muDuck').value = m.duck; $('muFade').value = m.fade;
   }
   const bind = (id, fn) => { $(id).onchange = e => { fn(e.target); touch(); }; };
@@ -1071,7 +1144,7 @@
     }
     const sx = sfxList(); if(sx.length) opts.sfx = sx.map(x => ({path:x.path, at:x.at, vol:x.vol}));
     if(S.au && S.au.norm) opts.normVoice = true;
-    beOpts(opts, vert, range);
+    beOpts(opts, vert, range); wmOpts(opts, range); ctOpts(opts, vert, range);
     if(S.film && S.film.on){ opts.film = {grain:+S.film.grain||0, vig:+S.film.vig||0, shake:+S.film.shake||0, tone:S.film.tone||'none', flash:!!S.film.flash}; if(opts.film.flash) sx.forEach(x => { if(frames[x.i] && frames[x.i].flash == null) frames[x.i].flash = Math.max(0, x.at - S.starts[x.i]); }); }
     if(range) opts.range = range;
     frames[0].opts = opts;
@@ -1371,6 +1444,7 @@
       DB = {active:null, channels:[{id:uid(), name:'Мой канал', sub:'', tabs:[t], tab:t.id}]};
       DB.active = DB.channels[0].id;
     }
+    if(!Array.isArray(DB.sounds)) DB.sounds = [];
   }
   function save(){ try{ localStorage.setItem('autocut.v2', JSON.stringify(DB)); }catch(e){} }
   const curCh = () => DB.channels.find(c => c.id===DB.active) || DB.channels[0];
@@ -1393,7 +1467,7 @@
   function serialize(st){
     return {lang:st.lang||'', imgs:st.imgs.map(i => i.n != null ? ({name:i.name, path:i.path||'', n:i.n}) : ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, film:st.film, au:st.au, tight:st.tight||null, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}, meta:st.meta||[], thumb:st.thumb||null, desc:st.desc||'', preset:st.preset||''};
+            pos:st.pos||0, rendered:!!st.rendered, lastOut:st.lastOut||'', pack:st.pack||null, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, film:st.film, au:st.au, ct:st.ct, tight:st.tight||null, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}, meta:st.meta||[], thumb:st.thumb||null, desc:st.desc||'', preset:st.preset||''};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -1416,7 +1490,7 @@
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d){ const f = findTab(id), pr = f && presetById(f.c.preset); if(pr) applyPresetTo(st, pr); return st; }
     st.lang = d.lang || ''; st.meta = Array.isArray(d.meta) ? d.meta : []; st.thumb = d.thumb || null; st.desc = d.desc || ''; st.preset = d.preset || '';
-    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = Object.assign(FLD(), d.film || {}); st.au = Object.assign(AUD(), d.au || {}); st.tight = d.tight || null; st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
+    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.lastOut = d.lastOut || ''; st.pack = d.pack || null; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = filmFix(d.film); st.au = Object.assign(AUD(), d.au || {}); st.ct = Object.assign(CTD(), d.ct || {}); st.tight = d.tight || null; st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => i.n != null ? ({name:i.name, path:i.path, url:fileUrl(i.path), n:i.n}) : ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
@@ -1507,7 +1581,7 @@
   function deleteProject(id){
     const f = findTab(id); if(!f) return;
     if(!confirm('Удалить проект «'+(f.t.name||'без названия')+'» навсегда?\nФайлы на вашем компьютере (картинки, озвучка, видео) останутся на месте.')) return;
-    try{ localStorage.removeItem(pKey(id)); }catch(e){}
+    try{ localStorage.removeItem(pKey(id)); localStorage.removeItem('autocut.h.'+id); }catch(e){}
     f.c.tabs = f.c.tabs.filter(t => t.id!==id); delete states[id];
     if(!openTabs(f.c).length) ensureTab(f.c);
     if(f.c.tab===id) f.c.tab = openTabs(f.c)[0].id;
@@ -1913,7 +1987,7 @@
       $('eRender').disabled = true; $('eTrial').disabled = true; const t0r = Date.now();
       const r = await NATIVE.render({frames, audioPath:S.audioPath});
       $('eRender').disabled = false; $('eTrial').disabled = false;
-      if(r.ok){ const sec = Math.round((Date.now()-t0r)/1000); $('rtxt').textContent = 'Готово за '+Math.floor(sec/60)+' мин '+String(sec%60).padStart(2,'0')+' с: '+r.out+sum; NATIVE.showItem(r.out); if(!range){ S.rendered = true; if(activeId) saveProject(activeId); } }
+      if(r.ok){ const sec = Math.round((Date.now()-t0r)/1000); $('rtxt').textContent = 'Готово за '+Math.floor(sec/60)+' мин '+String(sec%60).padStart(2,'0')+' с: '+r.out+sum; NATIVE.showItem(r.out); if(!range){ S.rendered = true; S.lastOut = r.out; if(activeId) saveProject(activeId); } }
       else if(r.cancelled){ $('rwrap').style.display='none'; }
       else { $('rtxt').textContent = r.error==='cancelled' ? 'Отменено' : 'Ошибка: '+r.error; }
     };
@@ -2198,7 +2272,7 @@
     if(!V3){ toast('Нужна новая версия программы (переустановка)'); return; }
     if(!S.audioPath || S.lines.length !== S.imgs.length || !S.imgs.length){ toast('Нужны озвучка, текст и картинки в одинаковом числе строк'); return; }
     if(S.starts.length>1 && S.mode!=='idle' && !confirm('Старая разметка этого проекта будет заменена. Продолжить?')) return;
-    const say = t => { $('msg').textContent = t; }; $('asrBtn').disabled = true;
+    histPush('Перед разметкой по речи'); const say = t => { $('msg').textContent = t; }; $('asrBtn').disabled = true;
     try{
       const tool = await asrEnsure(say);
       say('Подготавливаю звук…');
@@ -2356,11 +2430,11 @@
   const PS = {sel:''};
   function presets(){ if(!Array.isArray(DB.presets)) DB.presets = []; return DB.presets; }
   function presetById(id){ return id ? presets().find(p => p.id === id) || null : null; }
-  function pickSettings(st){ return JSON.parse(JSON.stringify({fx:st.fx, tr:st.tr, ql:st.ql || QD(), sb:st.sb, mu:st.mu, film:st.film || FLD(), au:st.au || AUD()})); }
+  function pickSettings(st){ return JSON.parse(JSON.stringify({fx:st.fx, tr:st.tr, ql:st.ql || QD(), sb:st.sb, mu:st.mu, film:st.film || FLD(), au:st.au || AUD(), ct:st.ct || CTD()})); }
   function applyPresetTo(st, p){
     const d = JSON.parse(JSON.stringify(p.data || {}));
     st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {});
-    st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = Object.assign(FLD(), d.film || {}); st.au = Object.assign(AUD(), d.au || {}); st.preset = p.id;
+    st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = filmFix(d.film); st.au = Object.assign(AUD(), d.au || {}); st.ct = Object.assign(CTD(), d.ct || {}); st.preset = p.id;
   }
   function sameAsPreset(st, p){ const t = newState(); applyPresetTo(t, p); return JSON.stringify(pickSettings(st)) === JSON.stringify(pickSettings(t)); }
   function psInfoUpd(){
@@ -2533,7 +2607,7 @@
   $('thClose').onclick = () => $('thModal').classList.remove('on');
 
   /* ====================== 4. sounds on scenes ====================== */
-  const SFX_LIB = [['boom','Удар'],['click','Щелчок'],['whoosh','Вжух'],['ding','Динь'],['pop','Поп'],['scratch','Скретч'],['trombone','Грустный тромбон']];
+  const SFX_LIB = [['boom','Удар'],['click','Щелчок'],['whoosh','Вжух'],['ding','Динь'],['pop','Поп'],['scratch','Скретч'],['trombone','Грустный тромбон'],['siren','Сирена'],['fire','Треск огня'],['clock','Тиканье часов'],['rumble','Нарастающий гул'],['impact','Тяжёлый удар'],['heart','Сердцебиение'],['glass','Разбитое стекло'],['riser','Нарастание напряжения']];
   function sfxList(){
     const out = [], n = Math.min(S.starts.length, S.meta.length);
     for(let i = 0; i < n; i++){ const m = S.meta[i]; if(m && m.sfx && m.sfx.path) out.push({i, at:Math.max(0, S.starts[i] + (+m.sfx.off || 0)), path:m.sfx.path, vol:(m.sfx.vol == null ? 100 : +m.sfx.vol)/100, name:m.sfx.name}); }
@@ -2550,7 +2624,7 @@
     return b64FromBytes(new Uint8Array(ab));
   }
   async function synthSfx(kind){
-    const SR = 44100, LEN = {boom:1.5, click:0.12, whoosh:0.85, ding:1.9, pop:0.22, scratch:0.55, trombone:3.0}[kind] || 1;
+    const SR = 44100, LEN = {boom:1.5, click:0.12, whoosh:0.85, ding:1.9, pop:0.22, scratch:0.55, trombone:3.0, siren:3.0, fire:2.5, clock:3.1, rumble:3.8, impact:1.8, heart:3.2, glass:1.6, riser:3.5}[kind] || 1;
     const ctx = new OfflineAudioContext(1, Math.ceil(SR*LEN), SR), out = ctx.destination;
     const osc = (type, f) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; return o; };
     const gain = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
@@ -2594,6 +2668,48 @@
         lp.connect(g).connect(master);
       });
     }
+
+    // more sounds for dramatic stories (all generated here, no files, no licences)
+    const bufSrc = (sec, fn) => { const b = ctx.createBuffer(1, Math.ceil(SR*sec), SR); fn(b.getChannelData(0)); const sr = ctx.createBufferSource(); sr.buffer = b; return sr; };
+    let seed = 987654; const rnd = () => { seed = (seed*1103515245 + 12345) & 0x7fffffff; return seed/0x7fffffff; };
+    if(kind === 'siren'){
+      const o = osc('sawtooth', 700), f = o.frequency; for(let k = 0; k < 3; k++){ f.setValueAtTime(620, k); f.linearRampToValueAtTime(1180, k + 0.5); f.linearRampToValueAtTime(620, k + 1); }
+      const lp = filt('lowpass', 2800), g = gain(0); env(g, [[0, 0], [0.15, 0.55], [2.7, 0.55], [3, 0.001, 1]]); o.connect(lp).connect(g).connect(out); o.start(0); o.stop(LEN);
+    } else if(kind === 'fire'){
+      const src = bufSrc(LEN, d => { for(let i = 0; i < d.length; i++){ d[i] = (rnd()*2 - 1)*0.05; if(rnd() < 0.0016){ const a = 0.4 + rnd()*0.6, dec = 40 + rnd()*160; for(let j = 0; j < 400 && i + j < d.length; j++) d[i+j] += (rnd()*2 - 1)*a*Math.exp(-j/dec); } } });
+      const hp = filt('highpass', 900), g = gain(0); env(g, [[0, 0], [0.2, 0.9], [2.2, 0.9], [2.5, 0.001, 1]]); src.connect(hp).connect(g).connect(out); src.start(0);
+      const nz = noise(LEN), lp = filt('lowpass', 420), g2 = gain(0.18); nz.connect(lp).connect(g2).connect(out); nz.start(0);
+    } else if(kind === 'clock'){
+      for(let k = 0; k < 6; k++){
+        const t0 = 0.05 + k*0.5, hi = k % 2 === 0, nz = noise(0.03), bp = filt('bandpass', hi ? 2600 : 1700, 3), ng = gain(0);
+        env(ng, [[t0, 0], [t0 + 0.001, 1], [t0 + 0.03, 0.001, 1]]); nz.connect(bp).connect(ng).connect(out); nz.start(t0);
+        const o = osc('sine', hi ? 1500 : 1000), g = gain(0); env(g, [[t0, 0], [t0 + 0.001, 0.5], [t0 + 0.05, 0.001, 1]]); o.connect(g).connect(out); o.start(t0); o.stop(t0 + 0.08);
+      }
+    } else if(kind === 'rumble'){
+      const nz = noise(LEN), lp = filt('lowpass', 90); lp.frequency.setValueAtTime(70, 0); lp.frequency.exponentialRampToValueAtTime(520, 3.6);
+      const g = gain(0); env(g, [[0, 0.02], [3.6, 1], [3.75, 0.001, 1]]); nz.connect(lp).connect(g).connect(out); nz.start(0);
+      const o = osc('sawtooth', 38); o.frequency.setValueAtTime(38, 0); o.frequency.exponentialRampToValueAtTime(95, 3.6);
+      const og = gain(0); env(og, [[0, 0.02], [3.6, 0.55], [3.75, 0.001, 1]]); o.connect(filt('lowpass', 260)).connect(og).connect(out); o.start(0); o.stop(LEN);
+    } else if(kind === 'impact'){
+      const o = osc('sine', 85); o.frequency.setValueAtTime(95, 0); o.frequency.exponentialRampToValueAtTime(24, 1.2);
+      const sh = ctx.createWaveShaper(), cv = new Float32Array(1024); for(let i = 0; i < 1024; i++) cv[i] = Math.tanh(3.2*(i/511.5 - 1)); sh.curve = cv;
+      const g = gain(0); env(g, [[0, 0], [0.003, 1], [1.7, 0.001, 1]]); o.connect(sh).connect(g).connect(out); o.start(0); o.stop(LEN);
+      const nz = noise(0.8), lp = filt('lowpass', 1400); lp.frequency.setValueAtTime(1800, 0); lp.frequency.exponentialRampToValueAtTime(120, 0.6);
+      const ng = gain(0); env(ng, [[0, 1], [0.6, 0.001, 1]]); nz.connect(lp).connect(ng).connect(out); nz.start(0);
+      const m = osc('square', 55), mg = gain(0); env(mg, [[0, 0], [0.002, 0.3], [0.25, 0.001, 1]]); m.connect(filt('lowpass', 500)).connect(mg).connect(out); m.start(0); m.stop(0.4);
+    } else if(kind === 'heart'){
+      for(let k = 0; k < 3; k++) [[0, 1], [0.27, 0.7]].forEach(([dt, a]) => { const t0 = 0.1 + k*1.0 + dt, o = osc('sine', 62); o.frequency.setValueAtTime(70, t0); o.frequency.exponentialRampToValueAtTime(38, t0 + 0.16);
+        const g = gain(0); env(g, [[t0, 0], [t0 + 0.012, a], [t0 + 0.2, 0.001, 1]]); o.connect(g).connect(out); o.start(t0); o.stop(t0 + 0.25);
+        const nz = noise(0.1), lp = filt('lowpass', 220), ng = gain(0); env(ng, [[t0, 0.5*a], [t0 + 0.06, 0.001, 1]]); nz.connect(lp).connect(ng).connect(out); nz.start(t0); });
+    } else if(kind === 'glass'){
+      const nz = noise(0.35), hp = filt('highpass', 3200), ng = gain(0); env(ng, [[0, 1], [0.3, 0.001, 1]]); nz.connect(hp).connect(ng).connect(out); nz.start(0);
+      for(let k = 0; k < 26; k++){ const t0 = 0.02 + rnd()*0.9, fr = 2800 + rnd()*6200, o = osc('sine', fr), g = gain(0); env(g, [[t0, 0], [t0 + 0.002, 0.18 + rnd()*0.2], [t0 + 0.12 + rnd()*0.3, 0.0005, 1]]); o.connect(g).connect(out); o.start(t0); o.stop(Math.min(LEN, t0 + 0.5)); }
+    } else if(kind === 'riser'){
+      const nz = noise(LEN), bp = filt('bandpass', 300, 2.2); bp.frequency.setValueAtTime(250, 0); bp.frequency.exponentialRampToValueAtTime(7000, 3.3);
+      const g = gain(0); env(g, [[0, 0.01], [3.3, 1], [3.42, 0.001, 1]]); nz.connect(bp).connect(g).connect(out); nz.start(0);
+      const o = osc('sawtooth', 180); o.frequency.setValueAtTime(180, 0); o.frequency.exponentialRampToValueAtTime(1500, 3.3);
+      const og = gain(0); env(og, [[0, 0.01], [3.3, 0.35], [3.42, 0.001, 1]]); o.connect(filt('lowpass', 2400)).connect(og).connect(out); o.start(0); o.stop(LEN);
+    }
     return wavB64(await ctx.startRendering());
   }
   async function sfxPath(kind){
@@ -2606,11 +2722,12 @@
   function sfxPreview(path, vol){ try{ if(SX.au) SX.au.pause(); const a = new Audio(fileUrl(path)); a.volume = Math.max(0, Math.min(1, (vol == null ? 100 : vol)/100 * (au.volume || 1))); SX.au = a; a.play().catch(() => {}); }catch(e){} }
   function renderSfx(){
     const m = metaOf(SX.i).sfx, box = $('sxList'); box.innerHTML = '';
-    SFX_LIB.forEach(([k, label]) => {
-      const el = document.createElement('div'); el.className = 'sxi' + (m && m.kind === k ? ' on' : '');
+    sndItems().forEach(it => {
+      const k = it.kind, label = it.label;
+      const el = document.createElement('div'); el.className = 'sxi' + (m && (it.own ? m.path === it.path : m.kind === k) ? ' on' : '');
       const b = document.createElement('b'); b.textContent = label; const pv = document.createElement('i'); pv.textContent = '▶'; pv.title = 'Послушать';
-      pv.onclick = async ev => { ev.stopPropagation(); try{ sfxPreview(await sfxPath(k), 100); }catch(e){ toast('Звук не готов: '+e.message); } };
-      el.onclick = async () => { try{ const p = await sfxPath(k); sfxSet({kind:k, name:label, path:p}); sfxPreview(p, metaOf(SX.i).sfx.vol); }catch(e){ toast('Звук не готов: '+e.message); } };
+      pv.onclick = async ev => { ev.stopPropagation(); try{ sfxPreview(await sndPathOf(it), 100); }catch(e){ toast('Звук не готов: '+e.message); } };
+      el.onclick = async () => { try{ const p = await sndPathOf(it); sfxSet({kind:k, name:label, path:p}); sfxPreview(p, metaOf(SX.i).sfx.vol); }catch(e){ toast('Звук не готов: '+e.message); } };
       el.append(b, pv); box.appendChild(el);
     });
     $('sxCur').textContent = m ? 'На кадре: '+m.name+(m.kind === 'file' ? ' (свой файл)' : '') : 'Звука на этом кадре нет';
@@ -2876,6 +2993,7 @@
       const badS = []; for(const x of sfxList()) if(await NATIVE.gen.size(x.path) <= 0) badS.push(x.i+1);
       if(badS.length) errs.push('Не найдены звуки на кадрах '+ranges(badS)+'. Поставьте их заново или уберите.');
     }
+    { const w = curCh().wm; if(NATIVE && w && w.on && w.kind === 'image' && w.path && await NATIVE.gen.size(w.path) <= 0) errs.push('Файл водяного знака не найден ('+w.name+'). Выберите его заново или выключите знак.'); }
     { const b = curCh().be; if(NATIVE && b && b.on) for(const k of ['intro','outro']) if(b[k] && await NATIVE.gen.size(b[k].path) <= 0) errs.push((k==='intro'?'Заставка':'Концовка')+' канала не найдена ('+b[k].name+'). Выберите файл заново или уберите её.'); }
     if(n >= 2 && S.dur){
       const lastStart = S.starts[n-1], d = durations(), short = [], long = [];
@@ -3126,7 +3244,7 @@ const AutoAlign = (function(){
     const n = S.imgs.length;
     if(S.lines.length !== n){ $('msg').textContent = 'Для авторазметки картинок и строк текста должно быть поровну: сейчас '+n+' и '+S.lines.length+'.'; return; }
     if(S.starts.length>1 && S.mode!=='idle' && !confirm('Старая разметка этого проекта будет заменена. Продолжить?')) return;
-    S.autoBusy = true; updAuto(); $('auto').textContent = 'Анализирую звук…'; $('msg').textContent = 'Анализирую озвучку, это займёт несколько секунд…';
+    histPush('Перед авторазметкой'); S.autoBusy = true; updAuto(); $('auto').textContent = 'Анализирую звук…'; $('msg').textContent = 'Анализирую озвучку, это займёт несколько секунд…';
     try{
       au.pause();
       const x = await decodeMono();
@@ -3434,7 +3552,7 @@ const AutoAlign = (function(){
   }
   async function applyPauses(){
     const cuts = AU.cuts; if(!cuts || !cuts.length) return;
-    AU.busy = true; auInfoUpd(); $('auInfo').textContent = 'Вырезаю паузы, это займёт меньше минуты…';
+    histPush('Перед сокращением пауз'); AU.busy = true; auInfoUpd(); $('auInfo').textContent = 'Вырезаю паузы, это займёт меньше минуты…';
     try{
       const segs = []; let pos = 0; cuts.forEach(c => { segs.push([pos, c.s]); pos = c.e; }); segs.push([pos, null]);
       const parts = segs.map((g, k) => '[0:a]atrim=start='+g[0].toFixed(3)+(g[1] != null ? ':end='+g[1].toFixed(3) : '')+',asetpts=PTS-STARTPTS[a'+k+']');
@@ -3552,7 +3670,7 @@ const AutoAlign = (function(){
     {t:'Что нужно оплатить', h:'<p>Сама программа сборки видео работает без подписок. Платные только сервисы, из которых вы берёте картинки и голос:</p><ul><li><b>Картинки, Gemini.</b> Бесплатного лимита хватает на пару картинок, не на ролик. Для 180 картинок нужна подписка Google AI Plus (в Украине около 115-225 грн в месяц, цена зависит от страны).</li><li><b>Озвучка, ElevenLabs.</b> Бесплатно примерно 10 000 символов в месяц, но только для некоммерческого использования. Для монетизируемого канала нужен платный тариф: Starter около 6 долларов в месяц (3 ролика по 10 минут), Creator около 22 долларов (около 12 роликов).</li><li>Можно обойтись без них: свои картинки и свою запись голоса добавляются как обычные файлы.</li></ul><p>Цены меняются, всегда сверяйтесь с сайтами сервисов.</p>'},
     {t:'Разметка: где какая картинка', h:'<p>Нужно определить, в какую секунду начинается каждая строка. Есть три способа:</p><ul><li><b>Разметить по речи.</b> Самый точный. Сначала выберите язык озвучки (английский, испанский, немецкий, французский, хинди и другие). При первом запуске программа один раз скачает модуль распознавания речи (150–470 МБ в зависимости от языка и точности).</li><li><b>Разметить автоматически.</b> Быстро, по паузам в озвучке. Подходит, если голос читает с паузами между строками.</li><li><b>Начать запись.</b> Вручную: включаете озвучку и нажимаете Пробел на каждой новой строке.</li></ul><p>После разметки откроется редактор: границы кадров можно двигать мышью на шкале.</p>'},
     {t:'Оформление', h:'<p>Всё оформление настраивается в левой колонке:</p><ul><li><b>Субтитры.</b> Можно показывать по строке или по 2–4 слова, слово подсвечивается в момент произнесения.</li><li><b>Движение камеры, переходы, плёнка.</b> Зерно, виньетка, тряска и вспышка на кадрах со звуком.</li><li><b>Звуки на кадрах и музыка.</b> Кнопка «Звук» в редакторе, музыка приглушается под голос.</li><li><b>Голос.</b> Выравнивание громкости и сокращение долгих пауз.</li></ul><p>Когда настроили под канал, сохраните это как пресет кнопкой «+» в разделе «Пресет канала». Новые видео этого канала будут сразу выглядеть так же.</p>'},
-    {t:'Сборка и всё после неё', h:'<ul><li><b>Проверить проект</b> найдёт пропавшие файлы и слишком длинные строки до того, как вы потратите время на сборку.</li><li><b>Разбор ритма</b> покажет слишком долгие кадры и места, где зритель может заскучать.</li><li><b>Собрать видео</b> можно целиком или сначала пробный кусок через «Просмотр результата».</li><li><b>Обложка, Главы, Shorts, Очередь.</b> Обложка 1280x720 с крупным текстом, главы для описания YouTube, вертикальные Shorts и сборка нескольких проектов подряд.</li><li><b>Резервная копия</b> сохранит проект со всеми файлами в выбранную папку.</li></ul>'},
+    {t:'Сборка и всё после неё', h:'<ul><li><b>Проверить проект</b> найдёт пропавшие файлы и слишком длинные строки до того, как вы потратите время на сборку.</li><li><b>Разбор ритма</b> покажет слишком долгие кадры и места, где зритель может заскучать.</li><li><b>Собрать видео</b> можно целиком или сначала пробный кусок через «Просмотр результата».</li><li><b>Обложка, Главы, Shorts, Очередь.</b> Обложка 1280x720 с крупным текстом, главы для описания YouTube, вертикальные Shorts и сборка нескольких проектов подряд.</li><li><b>Пакет для загрузки</b> создаёт папку с обложкой, названием, описанием с главами и источниками, тегами и памяткой. <b>История версий</b> позволяет вернуться к состоянию до авторазметки или сокращения пауз. <b>Как в ленте</b> в окне обложки показывает её в маленьком размере.</li><li><b>Заставка и концовка, водяной знак, титры частей.</b> Настраиваются один раз на канал и добавляются при полной сборке.</li><li><b>Звуки.</b> Под шкалой есть панель звуков: встроенные и ваши, их перетаскивают на нужные кадры.</li><li><b>Резервная копия</b> сохранит проект со всеми файлами в выбранную папку.</li></ul>'},
     {t:'Проверка компьютера', h:'<p>Проверим, что нужное для работы на месте.</p><div id="obChecks"></div><p style="margin-top:12px">Хотите попробовать без своих файлов? Программа создаст пробный проект с картинками, текстом и озвучкой, разметит его и покажет, как всё работает.</p><button class="btn primary" id="obDemo">Создать пробный проект</button><div class="hint" id="obDemoMsg"></div>'}
   ]};
   function obRender(){
@@ -3828,6 +3946,54 @@ const AutoAlign = (function(){
     if(e.key==='?' && tag!=='input' && tag!=='textarea' && !document.querySelector('.modal.on')){ e.preventDefault(); hkOpen(); }
   });
 
+
+  /* ---------- channel watermark ---------- */
+  const wmState = () => { const c = curCh(); if(!c.wm) c.wm = {on:false, kind:'text', text:'', path:'', name:'', pos:'br', size:12, op:70}; return c.wm; };
+  function wmTextPng(text){
+    const cv = document.createElement('canvas'), g = cv.getContext('2d'), px = 160, face = '"Arial Black","Segoe UI Black",Impact,Arial,sans-serif';
+    g.font = '900 '+px+'px '+face; const w = Math.ceil(g.measureText(text).width) + 80; cv.width = w; cv.height = px + 70;
+    g.font = '900 '+px+'px '+face; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    g.shadowColor = 'rgba(0,0,0,.65)'; g.shadowBlur = 18; g.shadowOffsetY = 6; g.lineWidth = 16; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(text, 40, cv.height/2);
+    g.shadowColor = 'transparent'; g.fillStyle = '#ffffff'; g.fillText(text, 40, cv.height/2);
+    return cv;
+  }
+  let wmImg = null;
+  function wmDraw(){
+    const w = wmState(), cv = $('wmCv'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+    g.fillStyle = '#1b1b24'; g.fillRect(0, 0, W, H); g.fillStyle = '#2a2a38'; for(let i = 0; i < 6; i++) g.fillRect(40 + i*95, 70 + (i%2)*60, 70, 110);
+    let src = null;
+    if(w.kind === 'text' && w.text.trim()) src = wmTextPng(w.text.trim());
+    else if(w.kind === 'image' && wmImg && wmImg.naturalWidth) src = wmImg;
+    if(!src) return;
+    const ww = W * w.size/100, hh = ww * (src.height || src.naturalHeight)/(src.width || src.naturalWidth), M = W*0.02;
+    const x = w.pos[1] === 'l' ? M : W - ww - M, y = w.pos[0] === 't' ? M : H - hh - M;
+    g.globalAlpha = w.op/100; g.drawImage(src, x, y, ww, hh); g.globalAlpha = 1;
+  }
+  function wmUi(){
+    const w = wmState(); $('wmOn').checked = !!w.on; $('wmKind').value = w.kind; $('wmText').value = w.text; $('wmPos').value = w.pos; $('wmSize').value = w.size; $('wmOp').value = w.op;
+    $('wmTextRow').style.display = w.kind === 'text' ? '' : 'none'; $('wmImgRow').style.display = w.kind === 'image' ? '' : 'none'; $('wmImgName').textContent = w.name || 'не выбран';
+    wmImg = null; if(w.kind === 'image' && w.path){ const im = new Image(); im.onload = () => { wmImg = im; wmDraw(); }; im.src = fileUrl(w.path); }
+    wmDraw();
+  }
+  $('wmOpen').onclick = () => { const w = wmState(); if(!w.text) w.text = curCh().name || ''; wmUi(); $('wmModal').classList.add('on'); };
+  $('wmClose').onclick = () => $('wmModal').classList.remove('on');
+  $('wmOn').onchange = e => { wmState().on = e.target.checked; save(); };
+  $('wmKind').onchange = e => { wmState().kind = e.target.value; save(); wmUi(); };
+  $('wmText').oninput = e => { wmState().text = e.target.value; save(); wmDraw(); };
+  $('wmPos').onchange = e => { wmState().pos = e.target.value; save(); wmDraw(); };
+  $('wmSize').oninput = e => { wmState().size = +e.target.value; save(); wmDraw(); };
+  $('wmOp').oninput = e => { wmState().op = +e.target.value; save(); wmDraw(); };
+  $('wmPick').onclick = () => { if(!NATIVE){ toast('Работает только в программе AutoCut для Windows'); return; } $('wmFile').click(); };
+  $('wmFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; const pth = NATIVE.pathFor(f); if(!pth){ toast('Не удалось получить путь к файлу'); return; }
+    const w = wmState(); w.path = pth; w.name = f.name; w.on = true; save(); wmUi(); };
+  function wmOpts(opts, range){
+    const c = curCh(), w = c.wm; if(!w || !w.on || range) return;
+    const o = {pos:w.pos, size:w.size, opacity:w.op/100};
+    if(w.kind === 'text'){ const t = (w.text || '').trim(); if(!t) return; o.png = wmTextPng(t).toDataURL('image/png').split(',')[1]; }
+    else { if(!w.path) return; o.path = w.path; }
+    opts.wm = o;
+  }
+
   /* ---------- channel intro / outro ---------- */
   const BE_VID = /\.(mp4|mov|mkv|webm|avi|m4v)$/i;
   let beWhich = 'intro';
@@ -3862,6 +4028,172 @@ const AutoAlign = (function(){
     if(b.intro) opts.intro = {path:b.intro.path, kind:b.intro.kind, dur:b.intro.dur};
     if(b.outro) opts.outro = {path:b.outro.path, kind:b.outro.kind, dur:b.outro.dur};
   }
+
+
+
+
+
+
+  /* ---------- how the thumbnail looks in the feed ---------- */
+  function feedDraw(){
+    const cv = $('feedCv'), g = cv.getContext('2d'), dark = $('fdTheme').value === 'dark', bg = dark ? '#0f0f0f' : '#ffffff', fg = dark ? '#f1f1f1' : '#0f0f0f', dim = dark ? '#aaaaaa' : '#606060';
+    const title = $('fdTitle').value.trim() || (curTab().name || 'Название видео'), ch = curCh().name || 'Канал', th = $('thCv');
+    g.fillStyle = bg; g.fillRect(0, 0, cv.width, cv.height);
+    const card = (x, y, w, lines, big) => {
+      const h = Math.round(w*9/16); g.save(); g.beginPath(); const r = big ? 12 : 8; g.moveTo(x+r, y); g.arcTo(x+w, y, x+w, y+h, r); g.arcTo(x+w, y+h, x, y+h, r); g.arcTo(x, y+h, x, y, r); g.arcTo(x, y, x+w, y, r); g.clip(); g.drawImage(th, x, y, w, h); g.restore();
+      g.fillStyle = 'rgba(0,0,0,.8)'; const bw = big ? 46 : 38, bh = big ? 20 : 17; g.fillRect(x+w-bw-6, y+h-bh-6, bw, bh); g.fillStyle = '#fff'; g.font = '600 '+(big ? 12 : 11)+'px Arial,sans-serif'; g.textAlign = 'center'; g.fillText(tcFmt(S.dur || 600), x+w-bw/2-6, y+h-bh/2-2); g.textAlign = 'left';
+      const fs = big ? 15 : 13; g.font = '600 '+fs+'px Arial,sans-serif'; g.fillStyle = fg;
+      const words = title.split(/\s+/), rows = []; let cur = '';
+      words.forEach(wd => { const t = cur ? cur+' '+wd : wd; if(g.measureText(t).width > w - (big ? 44 : 6) && cur){ rows.push(cur); cur = wd; } else cur = t; }); if(cur) rows.push(cur);
+      const tx = x + (big ? 42 : 0); if(big){ g.fillStyle = dim; g.beginPath(); g.arc(x+16, y+h+26, 16, 0, Math.PI*2); g.fill(); g.fillStyle = bg; g.font = '700 14px Arial'; g.textAlign = 'center'; g.fillText(ch.slice(0,1).toUpperCase(), x+16, y+h+31); g.textAlign = 'left'; g.font = '600 '+fs+'px Arial,sans-serif'; g.fillStyle = fg; }
+      rows.slice(0, 2).forEach((t, k) => g.fillText(t + (k === 1 && rows.length > 2 ? '…' : ''), tx, y+h+(big ? 22 : 20)+k*(fs+4)));
+      g.font = '400 '+(fs-2)+'px Arial,sans-serif'; g.fillStyle = dim; g.fillText(ch, tx, y+h+(big ? 22 : 20)+Math.min(2, rows.length)*(fs+4)); g.fillText('12 тыс. просмотров · 1 день назад', tx, y+h+(big ? 22 : 20)+Math.min(2, rows.length)*(fs+4)+(fs+1));
+    };
+    g.fillStyle = dim; g.font = '12px Arial'; g.fillText('Телефон', 16, 16); g.fillText('Компьютер', 400, 16); g.fillText('Боковая лента', 790, 16);
+    card(16, 26, 360, null, true); card(400, 26, 360, null, true); card(790, 26, 168, null, false);
+  }
+  $('thFeed').onclick = () => { $('fdTitle').value = (S.pack && S.pack.title) || curTab().name || ''; $('feedModal').classList.add('on'); feedDraw(); };
+  $('fdTitle').oninput = feedDraw; $('fdTheme').onchange = feedDraw; $('feedClose').onclick = () => $('feedModal').classList.remove('on');
+
+  /* ---------- version history of a project ---------- */
+  const HS_MAX = 8, hsKey = id => 'autocut.h.'+id;
+  function hsRead(id){ try{ const a = JSON.parse(localStorage.getItem(hsKey(id)) || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+  function histPush(label){
+    try{
+      if(!activeId || !S || (S.starts.length < 2 && !S.imgs.length)) return;
+      const data = JSON.stringify(serialize(S)), list = hsRead(activeId);
+      list.push({t:Date.now(), label, frames:S.starts.length, n:S.imgs.length, data});
+      while(list.length > HS_MAX) list.shift();
+      for(;;){ try{ localStorage.setItem(hsKey(activeId), JSON.stringify(list)); break; }catch(e){ if(list.length <= 1) break; list.shift(); } }
+    }catch(e){}
+  }
+  function hsRender(){
+    const box = $('hsList'); box.innerHTML = ''; const list = hsRead(activeId).slice().reverse();
+    if(!list.length){ box.innerHTML = '<div class="hint">Пока нет сохранённых версий. Они появятся перед первой разметкой или сокращением пауз.</div>'; return; }
+    list.forEach(h => {
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--panel2)';
+      const tx = document.createElement('div'); tx.style.flex = '1';
+      tx.innerHTML = '<b></b><div class="hint" style="margin:2px 0 0"></div>'; tx.firstChild.textContent = h.label;
+      tx.lastChild.textContent = new Date(h.t).toLocaleString('ru-RU', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})+' · кадров с разметкой: '+(h.frames || 0)+', картинок: '+(h.n || 0);
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Вернуть'; b.onclick = () => hsRestore(h);
+      row.append(tx, b); box.appendChild(row);
+    });
+  }
+  function hsRestore(h){
+    if(!confirm('Вернуть проект к версии «'+h.label+'» от '+new Date(h.t).toLocaleString('ru-RU')+'?\nТекущее состояние сохранится в истории, его можно будет вернуть.')) return;
+    histPush('Перед откатом');
+    const id = activeId; try{ localStorage.setItem(pKey(id), h.data); }catch(e){ toast('Не удалось вернуть версию'); return; }
+    stopAudio(); delete states[id]; S = hydrate(id); applyState(); renderTabs(); hsRender(); $('hsModal').classList.remove('on'); toast('Версия возвращена');
+  }
+  $('hsOpen').onclick = () => { hsRender(); $('hsModal').classList.add('on'); };
+  $('hsClose').onclick = () => $('hsModal').classList.remove('on');
+  $('hsSave').onclick = () => { histPush('Версия, сохранённая вручную'); hsRender(); toast('Версия сохранена'); };
+
+  /* ---------- upload pack ---------- */
+  const PK_AI = 'The images and narration in this video are AI-generated. The story is based on the historical sources listed above.';
+  const pkState = () => { if(!S.pack) S.pack = {title:'', tags:'', src:'', ai:true, aiTxt:PK_AI}; return S.pack; };
+  function pkUi(){ const p = pkState(); $('pkTitle').value = p.title || (curTab().name || ''); $('pkTags').value = p.tags; $('pkSrc').value = p.src; $('pkAi').checked = !!p.ai; $('pkAiTxt').value = p.aiTxt || PK_AI; $('pkMsg').textContent = ''; }
+  ['pkTitle','pkTags','pkSrc','pkAiTxt'].forEach(id => $(id).oninput = e => { const p = pkState(); p[{pkTitle:'title', pkTags:'tags', pkSrc:'src', pkAiTxt:'aiTxt'}[id]] = e.target.value; touch(); });
+  $('pkAi').onchange = e => { pkState().ai = e.target.checked; touch(); };
+  $('pkOpen').onclick = () => { if(!NATIVE){ toast('Пакет создаётся только в программе AutoCut для Windows'); return; } pkUi(); $('pkModal').classList.add('on'); };
+  $('pkClose').onclick = () => $('pkModal').classList.remove('on');
+  const pkText = t => b64FromBytes(new TextEncoder().encode('﻿'+t));
+  $('pkGo').onclick = async () => {
+    const p = pkState(), msg = t => $('pkMsg').textContent = t;
+    const title = (p.title || curTab().name || '').trim(); if(!title){ msg('Впишите название видео.'); return; }
+    let base = S.lastOut ? S.lastOut.replace(/[\\/][^\\/]*$/, '') : '';
+    if(!base){ base = await NATIVE.pickDir('Где создать папку пакета (лучше рядом с готовым видео)'); if(!base) return; }
+    const ok = await pkMake(base, p, title, msg);
+    if(ok === 'denied'){ const d = await NATIVE.pickDir('Выберите папку, где создать пакет'); if(d) await pkMake(d, p, title, msg); }
+  };
+  async function pkMake(base, p, title, msg){
+    const sep = base.includes('\\') ? '\\' : '/', safe = title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'video';
+    const dir = base + sep + safe + '_upload';
+    try{
+      const chapters = chapList().map(c => tcFmt(c.t)+' '+c.title), srcs = String(p.src || '').split('\n').map(x => x.trim()).filter(Boolean);
+      const parts = [String(S.desc || '').trim(), chapters.length ? 'Chapters:\n'+chapters.join('\n') : '', srcs.length ? 'Sources:\n'+srcs.join('\n') : '', p.ai ? String(p.aiTxt || PK_AI).trim() : ''].filter(Boolean);
+      const tags = String(p.tags || '').split(/[,\n]/).map(x => x.trim()).filter(Boolean);
+      const notes = ['ПАМЯТКА ПЕРЕД ЗАГРУЗКОЙ', '',
+        'Видео: '+(S.lastOut || 'не собрано в этой сессии, соберите видео кнопкой «Собрать видео»'), '',
+        '1. Загрузите видео и обложку thumbnail.jpg.', '2. Вставьте название из title.txt и описание из description.txt (в нём уже главы и источники).', '3. Теги из tags.txt вставьте в раздел «Теги» (необязательно, но помогает с похожими названиями).',
+        '4. Ответьте на вопрос YouTube про изменённый или синтетический контент по правилам платформы: картинки и озвучка сделаны ИИ.',
+        '5. Проверьте, что в видео нет чужой музыки и звуков без разрешения.', '',
+        chapters.length < 3 ? 'ВНИМАНИЕ: глав меньше трёх. YouTube показывает главы, только если их не меньше трёх и первая начинается с 0:00.' : (chapList()[0] && chapList()[0].t > 1 ? 'ВНИМАНИЕ: первая глава начинается не с 0:00, YouTube не покажет главы.' : 'Главы в порядке.'),
+        srcs.length ? 'Источники указаны: '+srcs.length+'.' : 'ВНИМАНИЕ: источники не указаны. Для канала про реальные события лучше их добавить.'].join('\n');
+      const w = async (name, b64) => { const r = await NATIVE.writeFile(dir, name, b64); if(!r.ok) throw new Error(r.error || name); return r.path; };
+      await w('title.txt', pkText(title)); await w('description.txt', pkText(parts.join('\n\n'))); await w('tags.txt', pkText(tags.join(', '))); await w('chapters.txt', pkText(chapters.join('\n')));
+      await w('sources.txt', pkText(srcs.join('\n'))); await w('README.txt', pkText(notes));
+      let thumb = false; if(S.imgs.length){ try{ await w('thumbnail.jpg', thJpeg()); thumb = true; }catch(e){} }
+      msg('Готово: '+dir+(thumb ? '' : '. Обложка не создана: добавьте картинки и откройте «Обложка».')); NATIVE.showItem(dir); toast('Пакет создан'); return 'ok';
+    }catch(e){ if(/not allowed/i.test(String(e.message || e))) return 'denied'; msg('Не удалось создать пакет: '+(e.message || e)); return 'error'; }
+  }
+
+  /* ---------- part titles on screen (from the chapters) ---------- */
+  function ctSync(){
+    const c = S.ct || (S.ct = CTD()); $('ctOn').checked = !!c.on; $('ctopts').classList.toggle('off', !c.on); $('ctPos').value = c.pos; $('ctDur').value = String(c.dur); $('ctSkip').checked = !!c.skip;
+  }
+  bind('ctOn', e => { (S.ct || (S.ct = CTD())).on = e.checked; ctSync(); }); bind('ctPos', e => S.ct.pos = e.value); bind('ctDur', e => S.ct.dur = +e.value); bind('ctSkip', e => S.ct.skip = e.checked);
+  function ctPng(title, num, pos){
+    const W = 1920, H = 1080, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    const face = '"Arial Black","Segoe UI Black",Impact,Arial,sans-serif', text = String(title).toLocaleUpperCase(), label = 'ЧАСТЬ '+num;
+    let size = 88; g.font = '900 '+size+'px '+face; while(size > 30 && g.measureText(text).width > 1500){ size -= 2; g.font = '900 '+size+'px '+face; }
+    const tw = g.measureText(text).width, lab = 38; g.font = '800 '+lab+'px '+face; const lw = g.measureText(label).width;
+    const bw = Math.max(tw, lw) + 90, bh = size + lab + 62;
+    const x = pos === 'c' ? (W - bw)/2 : 100, y = pos === 'tl' ? 90 : pos === 'c' ? (H - bh)/2 : H - bh - 130;
+    g.fillStyle = 'rgba(8,8,12,0.78)'; const r = 14; g.beginPath(); g.moveTo(x+r, y); g.arcTo(x+bw, y, x+bw, y+bh, r); g.arcTo(x+bw, y+bh, x, y+bh, r); g.arcTo(x, y+bh, x, y, r); g.arcTo(x, y, x+bw, y, r); g.fill();
+    g.fillStyle = '#e63946'; g.fillRect(x, y, 12, bh);
+    g.textBaseline = 'alphabetic'; g.font = '800 '+lab+'px '+face; g.fillStyle = '#e63946'; g.fillText(label, x + 48, y + 20 + lab*0.8);
+    g.font = '900 '+size+'px '+face; g.fillStyle = '#ffffff'; g.fillText(text, x + 48, y + 20 + lab + 14 + size*0.82);
+    return cv.toDataURL('image/png').split(',')[1];
+  }
+  function ctOpts(opts, vert, range){
+    const c = S.ct; if(!c || !c.on || vert || range) return;
+    let list = chapList(); if(c.skip && list.length && list[0].t < 1) list = list.slice(1);
+    const all = chapList(), base = c.skip && all.length && all[0].t < 1 ? 1 : 0;
+    const out = list.filter(x => x.title && x.title.trim()).map((x, k) => ({t:x.t, dur:c.dur, png:ctPng(x.title.trim(), k + 1 + base, c.pos)}));
+    if(out.length) opts.ct = out;
+  }
+
+  /* ---------- sound library strip: drag a sound onto a frame ---------- */
+  function sndItems(){
+    const own = (DB.sounds || []).map((x, n) => ({kind:'file', label:x.name, path:x.path, own:true, n}));
+    return SFX_LIB.map(([k, l]) => ({kind:k, label:l, path:'', own:false})).concat(own);
+  }
+  async function sndPathOf(it){ return it.path || await sfxPath(it.kind); }
+  function sfxSetAt(i, x){
+    const cur = metaOf(i).sfx; pushUndo();
+    setMeta(i, 'sfx', {kind:x.kind, name:x.name, path:x.path, vol:cur ? cur.vol : 100, off:cur ? cur.off : 0});
+    afterEdit(); toast('Звук «'+x.name+'» поставлен на кадр '+(i+1));
+  }
+  function renderSnd(){
+    const box = $('sndChips'); if(!box || !DB) return; box.innerHTML = '';
+    sndItems().forEach(it => {
+      const c = document.createElement('span'); c.className = 'sndchip'+(it.own ? ' own' : ''); c.draggable = true; c.title = it.own ? 'Ваш звук. Перетащите на кадр.' : 'Встроенный звук. Перетащите на кадр.';
+      const t = document.createElement('span'); t.textContent = it.label; c.appendChild(t);
+      if(it.own){ const x = document.createElement('i'); x.textContent = '×'; x.title = 'Убрать из библиотеки'; x.onclick = ev => { ev.stopPropagation(); DB.sounds.splice(it.n, 1); save(); renderSnd(); }; c.appendChild(x); }
+      c.onclick = async () => { try{ sfxPreview(await sndPathOf(it), 100); }catch(e){ toast('Звук не готов: '+e.message); } };
+      c.ondragstart = ev => { ev.dataTransfer.setData('text/autocut-sfx', JSON.stringify({kind:it.kind, name:it.label, path:it.path})); ev.dataTransfer.effectAllowed = 'copy'; };
+      box.appendChild(c);
+    });
+  }
+  $('sndAdd').onclick = () => { if(!NATIVE){ toast('Свои звуки добавляются только в программе AutoCut для Windows'); return; } $('sndFile').click(); };
+  $('sndFile').onchange = e => {
+    const fs_ = [...e.target.files]; e.target.value = ''; let added = 0;
+    fs_.forEach(f => { const p = NATIVE.pathFor(f); if(p && !(DB.sounds || []).some(x => x.path === p)){ DB.sounds.push({name:f.name.replace(/\.[^.]+$/, ''), path:p}); added++; } });
+    save(); renderSnd(); toast(added ? 'Звуков добавлено: '+added : 'Не удалось добавить файлы');
+  };
+  const tlDrop = $('tlwrap');
+  const frameFromEvent = ev => { const r = tl.getBoundingClientRect(); return Math.max(0, Math.min(S.starts.length-1, frameAt(tOf(ev.clientX - r.left)))); };
+  tlDrop.addEventListener('dragover', ev => { if([...ev.dataTransfer.types].includes('text/autocut-sfx')){ ev.preventDefault(); ev.dataTransfer.dropEffect = 'copy'; tlDrop.classList.add('drop'); } });
+  tlDrop.addEventListener('dragleave', () => tlDrop.classList.remove('drop'));
+  tlDrop.addEventListener('drop', async ev => {
+    tlDrop.classList.remove('drop');
+    const raw = ev.dataTransfer.getData('text/autocut-sfx'); if(!raw) return; ev.preventDefault();
+    if(!NATIVE){ toast('Звуки на кадрах работают только в программе AutoCut для Windows'); return; }
+    if(!S.starts.length){ toast('Сначала разметьте кадры'); return; }
+    const it = JSON.parse(raw), i = frameFromEvent(ev);
+    try{ const path = await sndPathOf(it); sfxSetAt(i, {kind:it.kind, name:it.name, path}); }catch(e){ toast('Звук не готов: '+e.message); }
+  });
 
   /* ---------- release calendar ---------- */
   const CAL = {y:new Date().getFullYear(), m:new Date().getMonth()};
@@ -3945,7 +4277,7 @@ const AutoAlign = (function(){
   Object.defineProperty(window,'__autocut',{get:()=>S}); // for debugging
   if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; try{ const last = localStorage.getItem('autocut.lastver'); if(last && last!==i.version) setTimeout(() => toast('Программа обновлена до v'+i.version), 600); localStorage.setItem('autocut.lastver', i.version); }catch(e){} }).catch(()=>{});
   renderKeys();
-  load(); renderChannels();
+  load(); renderChannels(); renderSnd();
   { const c = curCh(); const t = curTab(); c.tab = t.id; activeId = t.id; S = hydrate(t.id); renderTabs(); applyState(); }
   // returning to an unfinished recording: offer to continue, postpone or delete
   function askResume(){

@@ -237,13 +237,40 @@ async function makeBookend(bin, seg, out, opts, reg) {
 async function addBookends(bin, outPath, opts, tmpRoot, reg) {
   const parts = [];
   if (opts.intro && opts.intro.path) { const o = path.join(tmpRoot, 'intro.mp4'); await makeBookend(bin, opts.intro, o, opts, reg); parts.push(o); }
-  parts.push(outPath);
+  const mainIdx = parts.length; parts.push(outPath);
   if (opts.outro && opts.outro.path) { const o = path.join(tmpRoot, 'outro.mp4'); await makeBookend(bin, opts.outro, o, opts, reg); parts.push(o); }
-  if (parts.length < 2) return;
+  // channel watermark: a picture (or text drawn by the app as a picture) over the main part only
+  let wmFile = '';
+  const wm = opts.wm && (opts.wm.path || opts.wm.png) ? opts.wm : null;
+  if (wm) { wmFile = wm.path || path.join(tmpRoot, 'wm.png'); if (!wm.path) fs.writeFileSync(wmFile, Buffer.from(wm.png, 'base64')); }
+  const cts = (opts.ct || []).filter(x => x && x.png && isFinite(x.t)).slice(0, 40);
+  cts.forEach((x, k) => { x.file = path.join(tmpRoot, 'ct' + k + '.png'); fs.writeFileSync(x.file, Buffer.from(x.png, 'base64')); });
+  if (parts.length < 2 && !wm && !cts.length) return;
   const tmpOut = path.join(tmpRoot, 'joined.mp4'), args = ['-y', '-hide_banner'];
   parts.forEach(f => args.push('-i', f));
+  if (wm) args.push('-loop', '1', '-framerate', String(FPS), '-i', wmFile);
+  cts.forEach(x => args.push('-loop', '1', '-framerate', String(FPS), '-t', String(Math.max(1, +x.dur || 3)), '-i', x.file));
   let g = '';
-  parts.forEach((f, i) => { g += '[' + i + ':v]setsar=1,fps=' + FPS + ',format=yuv420p[v' + i + '];[' + i + ':a]aresample=48000,aformat=channel_layouts=stereo[a' + i + '];'; });
+  parts.forEach((f, i) => {
+    g += '[' + i + ':v]setsar=1,fps=' + FPS + ',format=yuv420p[v' + i + ((wm || cts.length) && i === mainIdx ? 'p' : '') + '];[' + i + ':a]aresample=48000,aformat=channel_layouts=stereo[a' + i + '];';
+  });
+  if (wm) {
+    const op = Math.max(0.05, Math.min(1, +wm.opacity || 0.7)), wpx = Math.max(24, Math.round(VW * Math.max(0.03, Math.min(0.5, (+wm.size || 12) / 100)) / 2) * 2), M = Math.round(VW * 0.02);
+    const pos = { tl: 'x=' + M + ':y=' + M, tr: 'x=W-w-' + M + ':y=' + M, bl: 'x=' + M + ':y=H-h-' + M, br: 'x=W-w-' + M + ':y=H-h-' + M }[wm.pos] || 'x=W-w-' + M + ':y=H-h-' + M;
+    g += '[' + parts.length + ':v]format=rgba,colorchannelmixer=aa=' + op.toFixed(2) + ',scale=' + wpx + ':-2[wm];[v' + mainIdx + 'p][wm]overlay=' + pos + ':shortest=1,format=yuv420p[v' + mainIdx + (cts.length ? 'w' : '') + '];';
+  }
+  if (cts.length) {
+    // part titles: each one fades in at its chapter start and out again, over the main part only
+    let cur = 'v' + mainIdx + 'p';
+    if (wm) { cur = 'v' + mainIdx + 'w'; }
+    const base = parts.length + (wm ? 1 : 0);
+    cts.forEach((x, k) => {
+      const D = Math.max(1, +x.dur || 3), nxt = k === cts.length - 1 && true ? null : null;
+      g += '[' + (base + k) + ':v]format=rgba,scale=' + VW + ':' + VH + ',fade=t=in:st=0:d=0.35:alpha=1,fade=t=out:st=' + Math.max(0.4, D - 0.5).toFixed(2) + ':d=0.5:alpha=1,setpts=PTS+' + Math.max(0, +x.t).toFixed(3) + '/TB[ct' + k + '];';
+      g += '[' + cur + '][ct' + k + ']overlay=eof_action=pass:format=auto,format=yuv420p[' + (k === cts.length - 1 ? 'v' + mainIdx : 'c' + k) + '];';
+      cur = 'c' + k;
+    });
+  }
   g += parts.map((f, i) => '[v' + i + '][a' + i + ']').join('') + 'concat=n=' + parts.length + ':v=1:a=1[v][a]';
   args.push('-filter_complex', g, '-map', '[v]', '-map', '[a]', ...encArgs(false, opts.quality), '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', tmpOut);
   await runFf(bin, args, null, reg);
@@ -408,9 +435,10 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
         });
       }
       if (cancelled) throw new Error('cancelled');
-      if (!opts.range && !vertical && ((opts.intro && opts.intro.path) || (opts.outro && opts.outro.path))) {
-        try { await addBookends(bin, outPath, opts, tmpRoot, reg); encoderNote += ' +intro/outro'; }
-        catch (e) { if (cancelled) throw e; encoderNote += ' (intro/outro failed, video left without them: ' + String(e.message || e).split('\n')[0].slice(0, 160) + ')'; }
+      if (!opts.range && ((!vertical && ((opts.intro && opts.intro.path) || (opts.outro && opts.outro.path))) || (opts.wm && (opts.wm.path || opts.wm.png)) || (!vertical && opts.ct && opts.ct.length))) {
+        const bo = vertical ? Object.assign({}, opts, { intro: null, outro: null, ct: null }) : opts;
+        try { await addBookends(bin, outPath, bo, tmpRoot, reg); encoderNote += ' +' + [bo.intro || bo.outro ? 'intro/outro' : '', opts.wm ? 'watermark' : '', (!vertical && opts.ct && opts.ct.length) ? 'titles' : ''].filter(Boolean).join('+'); }
+        catch (e) { if (cancelled) throw e; encoderNote += ' (intro/outro/watermark failed, video left without them: ' + String(e.message || e).split('\n')[0].slice(0, 160) + ')'; }
       }
       if (cancelled) throw new Error('cancelled');
       if (onProgress) onProgress(1);
@@ -431,7 +459,8 @@ function filmChain(film, flash, W, H) {
   const out = [];
   if (!film) return out;
   if (film.shake > 0) {
-    const z = film.shake >= 2 ? 1.07 : 1.035, a = film.shake >= 2 ? 0.95 : 0.8;
+    const SK = { 1: [1.008, 0.18], 2: [1.014, 0.3], 3: [1.025, 0.5], 4: [1.035, 0.8], 5: [1.07, 0.95] }[Math.min(5, Math.max(1, Math.round(film.shake)))];
+    const z = SK[0], a = SK[1];
     out.push('crop=w=iw/' + z + ':h=ih/' + z + ":x='(iw-ow)/2*(1+" + a + "*(sin(n*0.83)+0.5*sin(n*2.1+1))/1.5)':y='(ih-oh)/2*(1+" + a + "*(sin(n*1.07+2)+0.5*sin(n*2.7))/1.5)',scale=" + W + ':' + H + ':flags=bilinear,setsar=1');
   }
   if (film.tone === 'dark') out.push('eq=saturation=0.7:contrast=1.1:brightness=-0.03');
