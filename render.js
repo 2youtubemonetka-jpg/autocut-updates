@@ -52,7 +52,15 @@ function fitFrames(frames, audioLen) {
 
 /* ---------- motion effects (zoom / pan on a still image) ---------- */
 const FPS = 30;
-const FIT = 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1';
+let VW = 1920, VH = 1080;                 // output size of the current render
+let FIT = '', PLAIN = '';
+function setGeom(w, h) {
+  VW = w; VH = h;
+  FIT = 'scale=' + w + ':' + h + ':force_original_aspect_ratio=decrease,pad=' + w + ':' + h + ':(ow-iw)/2:(oh-ih)/2:color=black,setsar=1';
+  PLAIN = FIT + ',fps=' + FPS + ',format=yuv420p';
+}
+setGeom(1920, 1080);
+const ZW = () => (VW >= 3840 ? 5760 : VW * 2), ZH = () => (VH >= 2160 ? 3240 : VH * 2);
 function zpExpr(kind, N, zmax, end) {
   // end=true: the last frame of the move (a single still), otherwise the whole move over N frames
   const p = end ? '1' : 'on/' + Math.max(1, N - 1);
@@ -63,15 +71,14 @@ function zpExpr(kind, N, zmax, end) {
   else if (kind === 'out') { z = zmax + '-' + zA + '*' + p; x = cx; }
   else if (kind === 'lr') { z = String(zmax); x = '(iw-iw/zoom)*' + p; }          // camera moves left -> right
   else { z = String(zmax); x = '(iw-iw/zoom)*(1-' + p + ')'; }                     // right -> left
-  return "zoompan=z='" + z + "':x='" + x + "':y='" + y + "':d=" + (end ? 1 : N) + ':s=1920x1080:fps=' + FPS;
+  return "zoompan=z='" + z + "':x='" + x + "':y='" + y + "':d=" + (end ? 1 : N) + ':s=' + VW + 'x' + VH + ':fps=' + FPS;
 }
 function fxFilter(kind, N, zmax) {
-  return FIT + ',scale=3840:2160:flags=lanczos,' + zpExpr(kind, N, zmax, false) + ',format=yuv420p';
+  return FIT + ',scale=' + ZW() + ':' + ZH() + ':flags=lanczos,' + zpExpr(kind, N, zmax, false) + ',format=yuv420p';
 }
 function fxEndFilter(kind, zmax) {        // how a picture with this effect looks on its very last frame
-  return FIT + ',scale=3840:2160:flags=lanczos,' + zpExpr(kind, 2, zmax, true) + ',format=yuva420p';
+  return FIT + ',scale=' + ZW() + ':' + ZH() + ':flags=lanczos,' + zpExpr(kind, 2, zmax, true) + ',format=yuva420p';
 }
-const PLAIN = FIT + ',fps=' + FPS + ',format=yuv420p';
 
 function runFf(bin, args, onErr, reg) {
   return new Promise((resolve, reject) => {
@@ -145,6 +152,9 @@ function audioArgs(opts, voicePath, total, voiceSs) {
 function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
   const bin = ffmpeg || ffmpegPath();
   const opts = Object.assign({}, (frames[0] && frames[0].opts) || {});
+  const GEO = { 720: [1280, 720], 1080: [1920, 1080], 1440: [2560, 1440], 2160: [3840, 2160] }[+opts.height] || [1920, 1080];
+  setGeom(GEO[0], GEO[1]);
+  const Q = { fast: ['veryfast', '24'], normal: ['veryfast', '20'], high: ['medium', '16'] }[opts.quality] || ['veryfast', '20'];
   const kids = new Set();
   let cancelled = false, tail = '';
   const reg = c => { kids.add(c); c.on('close', () => kids.delete(c)); };
@@ -174,11 +184,11 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
         // fast path: one pass, still images through the concat demuxer
         const list = path.join(tmpRoot, 'list.txt');
         fs.writeFileSync(list, buildConcat(fr), 'utf8');
-        let vf = FIT + ',fps=30,format=yuv420p,tpad=stop_mode=clone:stop_duration=5';
+        let vf = FIT + ',fps=' + FPS + ',format=yuv420p,tpad=stop_mode=clone:stop_duration=5';
         if (fadeIn > 0) vf += ',fade=t=in:st=0:d=' + fadeIn.toFixed(2);
         if (fadeOutV > 0) vf += ',fade=t=out:st=' + Math.max(0, total - fadeOutV).toFixed(3) + ':d=' + fadeOutV.toFixed(2);
         const args = ['-y', '-hide_banner', '-f', 'concat', '-safe', '0', '-i', list, ...aa.inp, '-filter_complex', aa.graph, '-map', '0:v', '-vf', vf, '-map', '[a]',
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-tune', 'stillimage', '-c:a', 'aac', '-b:a', '192k', '-t', total.toFixed(3), '-movflags', '+faststart', outPath];
+          '-c:v', 'libx264', '-preset', Q[0], '-crf', Q[1], '-tune', 'stillimage', '-c:a', 'aac', '-b:a', '192k', '-t', total.toFixed(3), '-movflags', '+faststart', outPath];
         await runFf(bin, args, t => {
           tail = (tail + t).slice(-2500);
           const m = [...t.matchAll(/time=(\d+):(\d+):(\d+\.?\d*)/g)].pop();
@@ -232,7 +242,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
             // captions
             if (subLists[i]) {
               args.push('-f', 'concat', '-safe', '0', '-i', subLists[i]);
-              g.push('[' + idx + ':v]format=rgba[s0]');
+              g.push('[' + idx + ':v]format=rgba' + (VW !== 1920 ? ',scale=' + VW + ':-2:flags=lanczos' : '') + '[s0]');
               g.push('[' + cur + '][s0]overlay=0:H-h:eof_action=pass:format=auto[a2]'); cur = 'a2'; idx++;
             }
             // fade from / to black on the first / last clip
@@ -240,7 +250,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
             if (i === 0 && fadeIn > 0) tailChain += ',fade=t=in:st=0:d=' + Math.min(fadeIn, N / FPS).toFixed(2);
             if (i === fr.length - 1 && fadeOutV > 0) { const d = Math.min(fadeOutV, N / FPS); tailChain += ',fade=t=out:st=' + (N / FPS - d).toFixed(3) + ':d=' + d.toFixed(2); }
             g.push('[' + cur + ']' + tailChain + '[vout]');
-            args.push('-filter_complex', g.join(';'), '-map', '[vout]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', String(FPS), '-an', '-frames:v', String(N), clips[i]);
+            args.push('-filter_complex', g.join(';'), '-map', '[vout]', '-c:v', 'libx264', '-preset', Q[0], '-crf', Q[1], '-pix_fmt', 'yuv420p', '-r', String(FPS), '-an', '-frames:v', String(N), clips[i]);
             await runFf(bin, args, null, reg);
             done++; if (onProgress) onProgress(0.92 * done / fr.length);
           }

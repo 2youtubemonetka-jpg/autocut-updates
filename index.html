@@ -282,6 +282,17 @@
     </div>
 
     <div class="sec">
+      <h4>Качество видео</h4>
+      <div class="fxbox">
+        <div class="row"><span>Разрешение</span>
+          <select id="qRes"><option value="720">720p (HD)</option><option value="1080">1080p (Full HD)</option><option value="1440">1440p (2K)</option><option value="2160">2160p (4K)</option></select></div>
+        <div class="row"><span>Качество</span>
+          <select id="qQual"><option value="fast">Быстро, меньше размер</option><option value="normal">Обычное</option><option value="high">Высокое, дольше</option></select></div>
+        <div class="hint" style="margin:0">Чем выше разрешение и качество, тем дольше сборка и больше файл. Для YouTube хватает 1080p.</div>
+      </div>
+    </div>
+
+    <div class="sec">
       <h4>Субтитры</h4>
       <div class="fxbox">
         <label class="chk"><input type="checkbox" id="sbBurn"> Вшить в видео</label>
@@ -482,9 +493,10 @@
   const FXD = () => ({on:false, every:'1', kinds:['lr','rl','in','out'], order:'cycle', power:'mid'});
   const TRD = () => ({on:false, every:'1', dur:'0.4', fin:false, fout:false});
   const SBD = () => ({burn:false, srt:false, hl:true, size:'56'});
+  const QD = () => ({res:'1080', q:'normal'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
   const GND = () => ({text:'', dir:'', key:'', manual:{}});
-  const newState = () => ({fx:FXD(), tr:TRD(), sb:SBD(), mu:MUD(), gen:GND(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const newState = () => ({fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), gen:GND(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -567,12 +579,14 @@
   function renderPost(){
     const t = S.tr, b = S.sb, m = S.mu;
     $('trOn').checked = !!t.on; $('tropts').classList.toggle('off', !t.on); $('trEvery').value = t.every; $('trDur').value = t.dur;
+    const q = S.ql || (S.ql = QD()); $('qRes').value = q.res; $('qQual').value = q.q;
     $('trIn').checked = !!t.fin; $('trOut').checked = !!t.fout;
     $('sbBurn').checked = !!b.burn; $('sbopts').classList.toggle('off', !b.burn); $('sbHl').checked = !!b.hl; $('sbSize').value = b.size; $('sbSrt').checked = !!b.srt;
     $('muName').textContent = m.name || 'Трек не выбран'; $('muDel').style.display = m.path ? '' : 'none';
     $('muopts').classList.toggle('off', !m.path); $('muVol').value = m.vol; $('muDuck').value = m.duck; $('muFade').value = m.fade;
   }
   const bind = (id, fn) => { $(id).onchange = e => { fn(e.target); touch(); }; };
+  bind('qRes', e => (S.ql||(S.ql=QD())).res = e.value); bind('qQual', e => (S.ql||(S.ql=QD())).q = e.value);
   bind('trOn', e => { S.tr.on = e.checked; renderPost(); });
   bind('trEvery', e => S.tr.every = e.value); bind('trDur', e => S.tr.dur = e.value);
   bind('trIn', e => S.tr.fin = e.checked); bind('trOut', e => S.tr.fout = e.checked);
@@ -616,7 +630,7 @@
   function buildFrames(range){
     const d = durations(); computeWeights();
     const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i], fx:fxFor(i), zoom:fxZoom(), tr:trFor(i), text:S.lines[i]||''}));
-    const opts = {srt:!!S.sb.srt && !range, burn:!!S.sb.burn, fadeIn:S.tr.fin?0.8:0, fadeOut:S.tr.fout?1.2:0};
+    const opts = {srt:!!S.sb.srt && !range, burn:!!S.sb.burn, height:+((S.ql||QD()).res)||1080, quality:(S.ql||QD()).q, fadeIn:S.tr.fin?0.8:0, fadeOut:S.tr.fout?1.2:0};
     if(S.mu.path) opts.music = {path:S.mu.path, vol:(S.mu.vol||20)/100, duck:+S.mu.duck, fade:+S.mu.fade};
     if(S.sb.burn){
       let strip = 0;
@@ -927,7 +941,7 @@
   function serialize(st){
     return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, sb:st.sb, mu:st.mu, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}};
+            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -949,7 +963,7 @@
     const st = newState(); states[id] = st;
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d) return st;
-    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
+    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
