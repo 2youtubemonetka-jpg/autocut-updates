@@ -1436,10 +1436,12 @@
       $('rwrap').style.display = 'block';
       if(!S.audioPath || frames.some(f=>!f.path)){ $('rtxt').textContent = 'Не удалось получить пути к файлам. Выберите файлы заново через кнопки слева.'; return; }
       $('rbar').style.width='0'; $('rtxt').textContent = 'Собираю видео… 0%';
+      const nTr = frames.filter(f=>f.tr>0).length, nSb = frames.filter(f=>f.subs&&f.subs.length).length, nFx = frames.filter(f=>f.fx).length;
+      const sum = ' (переходов: '+nTr+', кадров с субтитрами: '+nSb+', кадров с движением: '+nFx+')';
       $('eRender').disabled = true; $('eTrial').disabled = true;
       const r = await NATIVE.render({frames, audioPath:S.audioPath});
       $('eRender').disabled = false; $('eTrial').disabled = false;
-      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out; NATIVE.showItem(r.out); if(!range){ S.rendered = true; if(activeId) saveProject(activeId); } }
+      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out+sum; NATIVE.showItem(r.out); if(!range){ S.rendered = true; if(activeId) saveProject(activeId); } }
       else if(r.cancelled){ $('rwrap').style.display='none'; }
       else { $('rtxt').textContent = r.error==='cancelled' ? 'Отменено' : 'Ошибка: '+r.error; }
     };

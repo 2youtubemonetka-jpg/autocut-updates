@@ -166,6 +166,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
     const hasTr = fr.some((f, i) => i > 0 && f.tr > 0);
     const hasFx = fr.some(f => f.fx);
     const fadeIn = Math.max(0, +opts.fadeIn || 0), fadeOutV = Math.max(0, +opts.fadeOut || 0);
+    try { fs.writeFileSync(outPath.replace(/\.[^.\\/]+$/, '') + '_log.txt', 'AutoCut render log\n' + new Date().toISOString() + '\nframes=' + fr.length + ' subs=' + hasSubs + ' transitions=' + hasTr + ' fx=' + hasFx + '\nopts=' + JSON.stringify(Object.assign({}, opts, { blankPng: opts.blankPng ? 'yes' : '' })) + '\nos=' + process.platform + ' tmp=' + os.tmpdir() + '\n', 'utf8'); } catch (_) {}
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'autocut_'));
     const aa = audioArgs(opts, audioPath, total, voiceSs);
     try {
