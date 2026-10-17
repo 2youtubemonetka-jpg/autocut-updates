@@ -448,6 +448,11 @@
     </div>
 
     <button class="big" id="start" disabled>Начать запись</button>
+    <div id="langBox" style="display:none;margin:0 0 8px">
+      <div class="row" style="margin-bottom:6px"><span style="color:var(--dim);font-size:13.5px;flex:1" title="Нужен для точной разметки по речи и названий глав">Язык озвучки</span><select id="langSel"></select></div>
+      <div class="row"><span style="color:var(--dim);font-size:13.5px;flex:1" title="Высокая точность скачивает модель побольше и работает дольше. Для хинди, корейского и некоторых других языков выбирается сама">Точность речи</span>
+        <select id="asrqSel"><option value="auto">Автоматически</option><option value="base">Обычная</option><option value="small">Высокая</option></select></div>
+    </div>
     <button class="btn" id="asrBtn" style="display:none;width:100%;margin-top:-6px" title="Программа распознает речь и точно найдёт начало каждой строки (первый раз скачает модуль)">Разметить по речи (точно)</button>
     <button class="btn" id="auto" disabled style="width:100%;margin-top:-6px" title="Программа сама найдёт, где заканчивается каждая строка, по паузам в озвучке">Разметить автоматически</button>
 
@@ -798,7 +803,7 @@
   const QD = () => ({res:'1080', q:'normal'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
   const GND = () => ({text:'', dir:'', key:'', manual:{}});
-  const newState = () => ({fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), film:FLD(), au:AUD(), gen:GND(), meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const newState = () => ({lang:'', fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), film:FLD(), au:AUD(), gen:GND(), meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -885,7 +890,7 @@
     $('trIn').checked = !!t.fin; $('trOut').checked = !!t.fout;
     $('sbBurn').checked = !!b.burn; $('sbopts').classList.toggle('off', !b.burn); $('sbHl').checked = !!b.hl; $('sbSize').value = b.size; $('sbSrt').checked = !!b.srt; $('sbMode').value = b.mode || 'line'; $('sbCol').value = b.col || 'red'; $('sbCaps').checked = !!b.caps; $('sbMode').disabled = !b.hl; if(typeof sbInfoUpd==='function') sbInfoUpd();
     $('muName').textContent = m.name || 'Трек не выбран'; $('muDel').style.display = m.path ? '' : 'none';
-    const fl = S.film || (S.film = FLD()); $('fiOn').checked = !!fl.on; $('fiopts').classList.toggle('off', !fl.on); $('fiGrain').value = fl.grain; $('fiVig').value = fl.vig; $('fiShake').value = fl.shake; $('fiTone').value = fl.tone; $('fiFlash').checked = !!fl.flash; $('stage').classList.toggle('film-vig', !!fl.on && +fl.vig > 0); $('auNorm').checked = !!(S.au && S.au.norm);
+    const fl = S.film || (S.film = FLD()); $('fiOn').checked = !!fl.on; $('fiopts').classList.toggle('off', !fl.on); $('fiGrain').value = fl.grain; $('fiVig').value = fl.vig; $('fiShake').value = fl.shake; $('fiTone').value = fl.tone; $('fiFlash').checked = !!fl.flash; $('stage').classList.toggle('film-vig', !!fl.on && +fl.vig > 0); $('auNorm').checked = !!(S.au && S.au.norm); if(typeof renderLang==='function') renderLang();
     $('muopts').classList.toggle('off', !m.path); $('muVol').value = m.vol; $('muDuck').value = m.duck; $('muFade').value = m.fade;
   }
   const bind = (id, fn) => { $(id).onchange = e => { fn(e.target); touch(); }; };
@@ -1306,7 +1311,7 @@
   function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2800); }
 
   function serialize(st){
-    return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
+    return {lang:st.lang||'', imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
             pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, film:st.film, au:st.au, tight:st.tight||null, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}, meta:st.meta||[], thumb:st.thumb||null, desc:st.desc||'', preset:st.preset||''};
   }
@@ -1330,7 +1335,7 @@
     const st = newState(); states[id] = st;
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d){ const f = findTab(id), pr = f && presetById(f.c.preset); if(pr) applyPresetTo(st, pr); return st; }
-    st.meta = Array.isArray(d.meta) ? d.meta : []; st.thumb = d.thumb || null; st.desc = d.desc || ''; st.preset = d.preset || '';
+    st.lang = d.lang || ''; st.meta = Array.isArray(d.meta) ? d.meta : []; st.thumb = d.thumb || null; st.desc = d.desc || ''; st.preset = d.preset || '';
     st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = Object.assign(FLD(), d.film || {}); st.au = Object.assign(AUD(), d.au || {}); st.tight = d.tight || null; st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
@@ -1577,6 +1582,7 @@
         out.push(l);
       }
       S.lines = out; S.txtName = f.name; computeWeights();
+      if(!S.lang){ const g = guessLang(out); if(g){ S.lang = g; renderLang(); toast('Язык озвучки определён: '+LANGS.find(l => l[0] === g)[1]); } }
       renderFiles(); refresh(); touch();
     };
     r.readAsText(f,'utf-8');
@@ -2023,11 +2029,24 @@
   }
 
   /* ---- exact alignment by speech recognition (whisper.cpp, downloaded once on first use) ---- */
+  // languages of the narration: code for speech recognition, name in the list, title of the first chapter
+  const LANGS = [['en', 'Английский', 'Intro'], ['es', 'Испанский', 'Introducción'], ['de', 'Немецкий', 'Einleitung'], ['fr', 'Французский', 'Introduction'], ['pt', 'Португальский', 'Introdução'], ['it', 'Итальянский', 'Introduzione'],
+    ['hi', 'Хинди', 'परिचय'], ['id', 'Индонезийский', 'Pendahuluan'], ['tr', 'Турецкий', 'Giriş'], ['pl', 'Польский', 'Wstęp'], ['uk', 'Украинский', 'Вступ'], ['ru', 'Русский', 'Вступление'], ['ko', 'Корейский', '소개']];
+  const HARD_LANGS = ['hi', 'id', 'tr', 'pl', 'uk', 'ko'];            // the small speech model is chosen for these unless the user decides otherwise
   const ASR = {
-    lang: () => { try{ return localStorage.getItem('autocut.asrlang') || 'en'; }catch(e){ return 'en'; } },
-    model: () => ASR.lang() === 'en' ? 'ggml-base.en.bin' : 'ggml-base.bin',
+    lang: () => { let v = S.lang || ''; if(!v){ try{ v = (curCh() || {}).lang || localStorage.getItem('autocut.asrlang') || ''; }catch(e){} } return LANGS.some(l => l[0] === v) ? v : 'en'; },
+    quality: () => { let q = 'auto'; try{ q = localStorage.getItem('autocut.asrq') || 'auto'; }catch(e){} if(q === 'auto') q = HARD_LANGS.includes(ASR.lang()) ? 'small' : 'base'; return q; },
+    model: () => 'ggml-'+ASR.quality()+(ASR.lang() === 'en' ? '.en' : '')+'.bin',
+    size: () => ASR.quality() === 'small' ? 'около 470 МБ' : 'около 150 МБ',
     exe: ['whisper-cli.exe', 'whisper-cli', 'main.exe']
   };
+  function introTitle(){ const l = LANGS.find(x => x[0] === ASR.lang()); if(S.lang || curCh().lang) return l[2]; return isRuText() ? 'Вступление' : 'Intro'; }
+  function guessLang(lines){
+    const t = lines.join(' ');
+    if(/[\u0900-\u097F]/.test(t)) return 'hi'; if(/[\uAC00-\uD7AF]/.test(t)) return 'ko';
+    if(/[\u0400-\u04FF]/.test(t)) return /[іїєґІЇЄҐ]/.test(t) ? 'uk' : 'ru';
+    return '';
+  }
   async function asrEnsure(say){
     let exe = await NATIVE.tool.find('whisper', ASR.exe);
     if(!exe){
@@ -2043,13 +2062,13 @@
     }
     const mrel = 'models/'+ASR.model();
     if(!(await NATIVE.tool.has(mrel))){
-      say('Скачиваю модель распознавания (около 150 МБ, один раз)…');
+      say('Скачиваю модель распознавания ('+ASR.size()+', один раз)…');
       const d = await NATIVE.tool.download({url:'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'+ASR.model(), rel:mrel});
       if(!d.ok) throw new Error('Загрузка модели: '+d.error);
     }
     return {exe, model:mrel};
   }
-  function normW(w){ return String(w||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+  function normW(w){ return String(w||'').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, ''); }
   function parseWhisper(json){
     const words = [];
     (json.transcription || []).forEach(seg => {
@@ -2123,7 +2142,7 @@
   /* ---- wiring ---- */
   if(NATIVE){
     NATIVE.onProgress(v => { if(progSink) progSink(v); });
-    $('shOpen').style.display = ''; $('qOpen').style.display = ''; $('ttsOpen').style.display = ''; $('asrBtn').style.display = '';
+    $('shOpen').style.display = ''; $('qOpen').style.display = ''; $('ttsOpen').style.display = ''; $('asrBtn').style.display = ''; $('langBox').style.display = '';
     $('shOpen').onclick = openShorts; $('qOpen').onclick = openQueue;
     $('shClose').onclick = () => $('shModal').classList.remove('on'); $('qClose').onclick = () => { if(!qBusy) $('qModal').classList.remove('on'); };
     $('shGo1').onclick = () => { const t0 = parseT($('shStart').value), len = parseInt($('shLen').value, 10) || 45; shortsRun([{t0, t1:Math.min(S.dur, t0+len)}]); };
@@ -2557,7 +2576,7 @@
   /* ====================== 5. chapters and description ====================== */
   const CP = {i:0, snap:null};
   function suggestTitle(i){
-    if(i === 0) return isRuText() ? 'Вступление' : 'Intro';
+    if(i === 0) return introTitle();
     let t = String(S.lines[i] || '').replace(/\[CARD:[^\]]*\]/ig, '').replace(/["«»“”]/g, '').trim();
     const ws = t.split(/\s+/).filter(Boolean); t = ws.slice(0, 6).join(' ').replace(/[,.;:!?…—–-]+$/, '');
     if(ws.length > 6) t += '…';
@@ -2566,7 +2585,7 @@
   function chapList(){
     const out = [];
     for(let i = 0; i < S.starts.length; i++){ const m = S.meta[i]; if(m && m.chap) out.push({i, t:S.starts[i], title:m.chap}); }
-    if(out.length && out[0].i !== 0) out.unshift({i:0, t:0, title:isRuText() ? 'Вступление' : 'Intro', auto:true});
+    if(out.length && out[0].i !== 0) out.unshift({i:0, t:0, title:introTitle(), auto:true});
     return out;
   }
   function openChap(){
@@ -3445,7 +3464,7 @@ const AutoAlign = (function(){
   const OB = {i:0, steps:[
     {t:'Что делает AutoCut', h:'<p>AutoCut собирает видео из готовых картинок и озвучки. Вы говорите программе, на какой фразе какая картинка, а она делает из этого mp4 с субтитрами, движением, переходами и музыкой.</p><ul><li>Картинки можно делать в Gemini прямо из программы или добавить свои.</li><li>Текст и озвучка у вас уже есть. Программа сама расставит кадры по озвучке.</li><li>Всё собирается на вашем компьютере, видео никуда не отправляется.</li></ul>'},
     {t:'Подготовьте материалы', h:'<p>Для одного видео нужны три вещи:</p><ul><li><b>Картинки.</b> Названия с номерами (image_1.png, image_2.png и так далее), чтобы они встали по порядку.</li><li><b>Текст.</b> Файл .txt, одна строка на одну картинку. Количество строк должно совпадать с количеством картинок.</li><li><b>Озвучка.</b> Файл mp3, wav или m4a с голосом без музыки.</li></ul><p>Перетащите файлы в три окошка слева или нажмите на них. Если числа не совпадают, программа предупредит.</p>'},
-    {t:'Разметка: где какая картинка', h:'<p>Нужно определить, в какую секунду начинается каждая строка. Есть три способа:</p><ul><li><b>Разметить по речи.</b> Самый точный. При первом запуске программа один раз скачает модуль распознавания речи (около 150 МБ).</li><li><b>Разметить автоматически.</b> Быстро, по паузам в озвучке. Подходит, если голос читает с паузами между строками.</li><li><b>Начать запись.</b> Вручную: включаете озвучку и нажимаете Пробел на каждой новой строке.</li></ul><p>После разметки откроется редактор: границы кадров можно двигать мышью на шкале.</p>'},
+    {t:'Разметка: где какая картинка', h:'<p>Нужно определить, в какую секунду начинается каждая строка. Есть три способа:</p><ul><li><b>Разметить по речи.</b> Самый точный. Сначала выберите язык озвучки (английский, испанский, немецкий, французский, хинди и другие). При первом запуске программа один раз скачает модуль распознавания речи (150–470 МБ в зависимости от языка и точности).</li><li><b>Разметить автоматически.</b> Быстро, по паузам в озвучке. Подходит, если голос читает с паузами между строками.</li><li><b>Начать запись.</b> Вручную: включаете озвучку и нажимаете Пробел на каждой новой строке.</li></ul><p>После разметки откроется редактор: границы кадров можно двигать мышью на шкале.</p>'},
     {t:'Оформление', h:'<p>Всё оформление настраивается в левой колонке:</p><ul><li><b>Субтитры.</b> Можно показывать по строке или по 2–4 слова, слово подсвечивается в момент произнесения.</li><li><b>Движение камеры, переходы, плёнка.</b> Зерно, виньетка, тряска и вспышка на кадрах со звуком.</li><li><b>Звуки на кадрах и музыка.</b> Кнопка «Звук» в редакторе, музыка приглушается под голос.</li><li><b>Голос.</b> Выравнивание громкости и сокращение долгих пауз.</li></ul><p>Когда настроили под канал, сохраните это как пресет кнопкой «+» в разделе «Пресет канала». Новые видео этого канала будут сразу выглядеть так же.</p>'},
     {t:'Сборка и всё после неё', h:'<ul><li><b>Проверить проект</b> найдёт пропавшие файлы и слишком длинные строки до того, как вы потратите время на сборку.</li><li><b>Разбор ритма</b> покажет слишком долгие кадры и места, где зритель может заскучать.</li><li><b>Собрать видео</b> можно целиком или сначала пробный кусок через «Просмотр результата».</li><li><b>Обложка, Главы, Shorts, Очередь.</b> Обложка 1280x720 с крупным текстом, главы для описания YouTube, вертикальные Shorts и сборка нескольких проектов подряд.</li><li><b>Резервная копия</b> сохранит проект со всеми файлами в выбранную папку.</li></ul>'},
     {t:'Проверка компьютера', h:'<p>Проверим, что нужное для работы на месте.</p><div id="obChecks"></div><p style="margin-top:12px">Хотите попробовать без своих файлов? Программа создаст пробный проект с картинками, текстом и озвучкой, разметит его и покажет, как всё работает.</p><button class="btn primary" id="obDemo">Создать пробный проект</button><div class="hint" id="obDemoMsg"></div>'}
@@ -3473,7 +3492,7 @@ const AutoAlign = (function(){
       let found = ''; for(const p of list){ if(await NATIVE.gen.size(p) > 0){ found = p; break; } }
       found ? set('ch', 'ok', 'Готово', 'Найден браузер для генерации картинок через Gemini: '+(/edge/i.test(found) ? 'Microsoft Edge' : 'Google Chrome')+'.') : set('ch', 'warn', 'Не нужен', 'Google Chrome не найден. Он нужен только для генерации картинок через Gemini. Со своими картинками всё работает без него.');
     }catch(e){ set('ch', 'warn', 'Не проверено', 'Не удалось проверить наличие Chrome.'); }
-    try{ const has = await NATIVE.tool.has('models/'+ASR.model()); has ? set('asr', 'ok', 'Готово', 'Модуль распознавания речи установлен.') : set('asr', 'wait', 'Позже', 'Модуль распознавания речи скачается один раз (около 150 МБ), когда вы нажмёте «Разметить по речи».'); }catch(e){ set('asr', 'wait', 'Позже', 'Модуль распознавания речи скачается при первом использовании.'); }
+    try{ const has = await NATIVE.tool.has('models/'+ASR.model()); has ? set('asr', 'ok', 'Готово', 'Модуль распознавания речи установлен.') : set('asr', 'wait', 'Позже', 'Модуль распознавания речи скачается один раз ('+ASR.size()+'), когда вы нажмёте «Разметить по речи».'); }catch(e){ set('asr', 'wait', 'Позже', 'Модуль распознавания речи скачается при первом использовании.'); }
   }
   $('helpOpen').onclick = () => obOpen(0);
   $('obClose').onclick = obClose; $('obNext').onclick = () => { if(OB.i >= OB.steps.length-1) obClose(); else { OB.i++; obRender(); } };
@@ -3533,6 +3552,17 @@ const AutoAlign = (function(){
     $('obDemo').disabled = false;
   }
   if(NATIVE){ let seen = false; try{ seen = localStorage.getItem('autocut.onb') === '1'; }catch(e){} if(!seen) setTimeout(() => obOpen(0), 700); }
+
+
+  /* ====================== v6: narration language ====================== */
+  function renderLang(){
+    const sel = $('langSel'); if(!sel.options.length) LANGS.forEach(l => sel.appendChild(new Option(l[1], l[0])));
+    sel.value = ASR.lang(); let q = 'auto'; try{ q = localStorage.getItem('autocut.asrq') || 'auto'; }catch(e){} $('asrqSel').value = q;
+    $('asrBtn').textContent = 'Разметить по речи (точно, '+LANGS.find(l => l[0] === sel.value)[1].toLowerCase()+')';
+  }
+  $('langSel').onchange = e => { S.lang = e.target.value; try{ const c = curCh(); if(c) c.lang = S.lang; save(); }catch(err){} renderLang(); touch(); };
+  $('asrqSel').onchange = e => { try{ localStorage.setItem('autocut.asrq', e.target.value); }catch(err){} renderLang(); };
+  renderLang();
 
   Object.defineProperty(window,'__autocut',{get:()=>S}); // for debugging
   if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; try{ const last = localStorage.getItem('autocut.lastver'); if(last && last!==i.version) setTimeout(() => toast('Программа обновлена до v'+i.version), 600); localStorage.setItem('autocut.lastver', i.version); }catch(e){} }).catch(()=>{});
