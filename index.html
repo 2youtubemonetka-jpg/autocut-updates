@@ -187,6 +187,9 @@
   .chip{padding:5px 13px;border-radius:99px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px}
   .chip.on{border-color:var(--accent2);color:var(--text);background:var(--panel)}
   .libgrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;align-content:start;padding:2px 2px 14px}
+  details.how{border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:8px 10px;margin:0 0 10px;font-size:13px;line-height:1.5}
+  details.how summary{cursor:pointer;font-weight:600}
+  details.how ol{margin:8px 0 0;padding-left:20px;display:grid;gap:5px}
   .pcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
   .pcard.cur{border-color:var(--accent)}
   .pth{aspect-ratio:16/9;background:var(--stage);display:grid;place-items:center;color:var(--dim);font-size:13px;position:relative}
@@ -283,6 +286,7 @@
         </div>
         <input id="chName" class="chname" placeholder="Название канала" maxlength="60" spellcheck="false">
         <input id="chSub" class="chsub" placeholder="Описание (необязательно)" maxlength="90" spellcheck="false">
+        <button class="btn" id="beOpen" style="width:100%;margin-top:6px" title="Картинка или ролик в начале и в конце каждого видео канала">Заставка и концовка</button>
       </div>
     </div>
 
@@ -297,6 +301,7 @@
           <input type="file" id="fTxt" accept=".txt,text/plain"></label>
         <button class="btn" id="ttsOpen" style="display:none;width:100%">Озвучить текст (ElevenLabs)</button>
         <button class="btn" id="genOpen" style="display:none;width:100%" title="Программа сама сгенерирует картинки в Gemini по вашим промтам">Сгенерировать картинки (Gemini)</button>
+        <div class="hint" id="payHint" style="display:none;margin:0">Озвучка и картинки через ElevenLabs и Gemini требуют платных подписок. Подробности внутри каждого окна.</div>
       </div>
     </div>
 
@@ -435,6 +440,9 @@
         <button class="btn full" id="pfOpen" title="Найти проблемы до сборки: пропавшие файлы, длинные строки, звук короче разметки">Проверить проект</button>
         <button class="btn" id="thOpen" title="Обложка 1280x720 из кадра видео с крупным текстом">Обложка</button>
         <button class="btn" id="chOpen" title="Список глав с временем для описания на YouTube">Главы</button>
+        <button class="btn" id="fdOpen" title="Перейти к кадру по номеру или найти по тексту (Ctrl+F)">Поиск кадра</button>
+        <button class="btn" id="hkOpen" title="Список горячих клавиш (клавиша ?)">Горячие клавиши</button>
+        <button class="btn" id="simOpen" title="Найти соседние кадры с почти одинаковыми картинками">Похожие картинки</button>
         <button class="btn" id="rhOpen" title="Длина кадров, темп речи, места, где зритель может заскучать">Разбор ритма</button>
         <button class="btn" id="shOpen" style="display:none">Shorts 9:16</button>
         <button class="btn" id="qOpen" style="display:none">Очередь</button>
@@ -626,7 +634,7 @@
       <div class="throw"><span>Наклон</span><select id="thTilt" class="inp"><option value="0">Нет</option><option value="-4">Влево</option><option value="4">Вправо</option></select></div>
       <div class="throw"><span>Затемнение</span><select id="thDim" class="inp"><option value="0">Нет</option><option value="0.45">Лёгкое</option><option value="0.75">Сильное</option></select></div>
       <div class="throw"><span>Приближение</span><input type="range" id="thZoom" min="100" max="250" value="100"></div>
-      <div class="btns"><button class="btn primary" id="thSave">Сохранить обложку</button><button class="btn" id="thSaveAs" style="display:none">В другую папку…</button></div>
+      <div class="btns"><button class="btn primary" id="thSave">Сохранить обложку</button><button class="btn" id="thSaveAs" style="display:none">В другую папку…</button><button class="btn" id="thStyleSave" title="Цвета, плашка, положение и размер текста будут сразу у обложек всех новых видео этого канала">Запомнить стиль для канала</button></div>
       <div class="hint" id="thMsg" style="margin:0 0 8px;min-height:18px">Сохраняется в JPG 1280x720 до 2 МБ, как требует YouTube.</div>
       <button class="btn" id="thClose">Закрыть</button>
     </div>
@@ -707,6 +715,33 @@
   <div id="obBody"></div>
   <div class="btns"><button class="btn" id="obBack">Назад</button><button class="btn primary" id="obNext">Дальше</button><button class="btn" id="obClose">Закрыть</button></div>
 </div></div>
+<div class="modal" id="fdModal"><div class="card mid">
+  <h2>Поиск кадра</h2>
+  <input id="fdQ" class="inp" placeholder="Номер кадра или слова из текста" spellcheck="false" autocomplete="off">
+  <div class="hint" id="fdInfo" style="margin:6px 0"></div>
+  <div id="fdList" style="max-height:44vh;overflow:auto;display:grid;gap:4px"></div>
+  <div class="btns"><button class="btn" id="fdClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="hkModal"><div class="card mid">
+  <h2>Горячие клавиши</h2><p class="hint" style="margin:0 0 8px">Основные клавиши можно поменять в настройках. Здесь стандартные.</p>
+  <div id="hkBody" style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px"></div>
+  <div class="btns"><button class="btn" id="hkClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="simModal"><div class="card wide">
+  <h2>Похожие картинки подряд</h2>
+  <p class="hint" id="simSub" style="margin:0 0 8px"></p>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span>Строгость</span><input type="range" id="simTh" min="50" max="95" value="75"><b id="simThV">75%</b></div>
+  <div id="simList" style="max-height:48vh;overflow:auto;display:grid;gap:8px"></div>
+  <div class="btns"><button class="btn" id="simClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="beModal"><div class="card mid">
+  <h2>Заставка и концовка канала</h2>
+  <p class="hint" style="margin:0 0 8px">Подставляются в каждое видео этого канала при сборке. Картинка показывается несколько секунд, видеофайл вставляется целиком. В пробный просмотр и Shorts не добавляются.</p>
+  <label style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" id="beOn"> Добавлять при сборке</label>
+  <div id="beRows"></div>
+  <input type="file" id="beFile" accept="image/*,video/*" style="display:none">
+  <div class="btns"><button class="btn primary" id="beClose">Готово</button></div>
+</div></div>
 <div class="modal" id="calModal"><div class="card wide">
   <h2>Календарь выходов</h2>
   <div class="hint" id="calNudge" style="margin:0 0 8px"></div>
@@ -762,6 +797,15 @@
 <div class="modal" id="ttsModal"><div class="card mid">
   <h2>Озвучка (ElevenLabs)</h2>
   <p class="hint">Нужен ваш ключ API ElevenLabs. Он хранится только на этом компьютере.</p>
+  <details class="how" open><summary>Что нужно, чтобы озвучка работала</summary>
+    <ol>
+      <li>Аккаунт на elevenlabs.io. Ключ: профиль, затем «API Keys», создать ключ и вставить сюда.</li>
+      <li>Бесплатный тариф: около 10 000 символов в месяц, это примерно один ролик, но <b>только для некоммерческого использования</b> и со ссылкой на ElevenLabs. Для канала, который вы монетизируете, нужен платный тариф.</li>
+      <li>Платные тарифы (цены на 2026 год, проверяйте на сайте): Starter около 6 долларов в месяц, 30 000 символов; Creator около 22 долларов, 121 000 символов.</li>
+      <li>Расход: один символ текста это один кредит. Сценарий на 10 минут (около 10 000 символов) это примерно 10 000 кредитов. Starter хватит на 3 ролика в месяц, Creator на 12.</li>
+      <li>Дешёвая модель eleven_flash_v2_5 тратит меньше кредитов, но звучит чуть проще. Для основного голоса лучше eleven_multilingual_v2.</li>
+    </ol>
+  </details>
   <input id="ttKey" class="inp" type="password" placeholder="Ключ API">
   <button class="btn" id="ttLoad">Загрузить голоса</button>
   <select id="ttVoice" class="inp"></select>
@@ -774,6 +818,15 @@
 <div class="modal" id="genModal">
   <div class="card" style="width:min(720px,94vw);max-height:92vh;overflow-y:auto">
     <h2>Генерация картинок в Gemini</h2>
+    <details class="how"><summary>Что нужно, чтобы картинки генерировались</summary>
+      <ol>
+        <li>Браузер Google Chrome или Microsoft Edge и аккаунт Google. Программа открывает окно Gemini и сама вставляет в него промты, вы входите в аккаунт один раз.</li>
+        <li>Бесплатный Gemini даёт мало картинок в день, на целый ролик (около 180 штук) их не хватит.</li>
+        <li>Для ролика нужна платная подписка Google AI Plus. В Украине это около 115 грн в месяц первые полгода, потом около 225 грн (цена зависит от страны и меняется). В ней выше лимиты на создание картинок в Gemini.</li>
+        <li>Если лимит кончился, программа остановится: подождите сброса лимита или продолжите на следующий день, уже готовые картинки не пропадут.</li>
+        <li>Одна картинка делается 20-60 секунд, 180 картинок это примерно 1-3 часа. Окно Gemini трогать в это время не нужно.</li>
+      </ol>
+    </details>
     <div class="hint" style="margin:0 0 8px">Вставьте промты: каждая сцена отделяется пустой строкой. Сначала нажмите «Открыть Gemini» и один раз войдите в аккаунт Google в открывшемся окне Chrome.</div>
     <textarea id="gPrompts" style="width:100%;height:180px;resize:vertical;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px;font:13px/1.4 inherit" placeholder="Промт сцены 1&#10;&#10;Промт сцены 2&#10;&#10;..."></textarea>
     <div class="row" style="margin:8px 0;flex-wrap:wrap">
@@ -1018,6 +1071,7 @@
     }
     const sx = sfxList(); if(sx.length) opts.sfx = sx.map(x => ({path:x.path, at:x.at, vol:x.vol}));
     if(S.au && S.au.norm) opts.normVoice = true;
+    beOpts(opts, vert, range);
     if(S.film && S.film.on){ opts.film = {grain:+S.film.grain||0, vig:+S.film.vig||0, shake:+S.film.shake||0, tone:S.film.tone||'none', flash:!!S.film.flash}; if(opts.film.flash) sx.forEach(x => { if(frames[x.i] && frames[x.i].flash == null) frames[x.i].flash = Math.max(0, x.at - S.starts[x.i]); }); }
     if(range) opts.range = range;
     frames[0].opts = opts;
@@ -2169,7 +2223,7 @@
   /* ---- wiring ---- */
   if(NATIVE){
     NATIVE.onProgress(v => { if(progSink) progSink(v); });
-    $('shOpen').style.display = ''; $('qOpen').style.display = ''; $('ttsOpen').style.display = ''; $('asrBtn').style.display = ''; $('langBox').style.display = '';
+    $('shOpen').style.display = ''; $('qOpen').style.display = ''; $('ttsOpen').style.display = ''; $('payHint').style.display = ''; $('asrBtn').style.display = ''; $('langBox').style.display = '';
     $('shOpen').onclick = openShorts; $('qOpen').onclick = openQueue;
     $('shClose').onclick = () => $('shModal').classList.remove('on'); $('qClose').onclick = () => { if(!qBusy) $('qModal').classList.remove('on'); };
     $('shGo1').onclick = () => { const t0 = parseT($('shStart').value), len = parseInt($('shLen').value, 10) || 45; shortsRun([{t0, t1:Math.min(S.dur, t0+len)}]); };
@@ -2366,7 +2420,7 @@
   [['thFg','#ffffff'],['thHl','#ffd60a']].forEach(([id]) => { const s = $(id); TH_COLORS.forEach(([v, n]) => s.appendChild(new Option(n, v))); });
   const THD = () => ({src:'scene', scene:0, file:'', text:'', fg:'#ffffff', hl:'#ffd60a', box:'', pos:'left', size:100, tilt:0, dim:0.45, zoom:100, x:0, y:0});
   const TH = {img:null, key:'', raf:0, drag:null};
-  function thState(){ if(!S.thumb) S.thumb = Object.assign(THD(), {scene:Math.max(0, S.starts.length ? curI() : 0)}); return S.thumb; }
+  function thState(){ if(!S.thumb) S.thumb = Object.assign(THD(), curCh().thStyle || {}, {scene:Math.max(0, S.starts.length ? curI() : 0)}); return S.thumb; }
   function thSrc(T){
     if(T.src === 'file' && T.file) return {key:'f:'+T.file, url:NATIVE ? fileUrl(T.file) : (TH.blob || '')};
     const im = S.imgs[Math.max(0, Math.min(S.imgs.length-1, T.scene))]; return im ? {key:'s:'+im.path+'|'+im.url, url:im.url} : {key:'', url:''};
@@ -2444,6 +2498,7 @@
   $('thFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; const T = thState();
     T.src = 'file'; T.file = NATIVE ? NATIVE.pathFor(f) : f.name; TH.blob = URL.createObjectURL(f); T.x = 0; T.y = 0; touch(); thUi(); thLoad(); };
   $('thText').oninput = e => thSet('text', e.target.value);
+  $('thStyleSave').onclick = () => { const T = thState(), st = {}; ['fg','hl','box','pos','size','tilt','dim','zoom'].forEach(k => st[k] = T[k]); curCh().thStyle = st; save(); $('thMsg').textContent = 'Стиль запомнен: он будет у обложек новых видео канала «'+(curCh().name||'')+'».'; };
   [['thFg','fg'],['thHl','hl'],['thBox','box'],['thPos','pos']].forEach(([id, k]) => $(id).onchange = e => thSet(k, e.target.value));
   $('thTilt').onchange = e => thSet('tilt', +e.target.value); $('thDim').onchange = e => thSet('dim', +e.target.value);
   $('thSize').oninput = e => thSet('size', +e.target.value); $('thZoom').oninput = e => thSet('zoom', +e.target.value);
@@ -2821,6 +2876,7 @@
       const badS = []; for(const x of sfxList()) if(await NATIVE.gen.size(x.path) <= 0) badS.push(x.i+1);
       if(badS.length) errs.push('Не найдены звуки на кадрах '+ranges(badS)+'. Поставьте их заново или уберите.');
     }
+    { const b = curCh().be; if(NATIVE && b && b.on) for(const k of ['intro','outro']) if(b[k] && await NATIVE.gen.size(b[k].path) <= 0) errs.push((k==='intro'?'Заставка':'Концовка')+' канала не найдена ('+b[k].name+'). Выберите файл заново или уберите её.'); }
     if(n >= 2 && S.dur){
       const lastStart = S.starts[n-1], d = durations(), short = [], long = [];
       if(lastStart >= S.dur - 0.05) errs.push('Озвучка короче разметки: последний кадр начинается в '+fmt(lastStart)+', а звук длится '+fmt(S.dur)+'. Похоже, озвучку заменили: разметьте заново.');
@@ -3307,6 +3363,7 @@ const AutoAlign = (function(){
   document.addEventListener('keydown', e => {
     if(window.__licLocked) return;
     if(capturing){ e.preventDefault(); e.stopPropagation(); captureKey(e); return; }
+    if((e.ctrlKey || e.metaKey) && e.code==='KeyF') return;
     const tag = (e.target.tagName||'').toLowerCase();
     if(VIEW==='lib' && actionOf(e.code)!=='full') return;
     if(tag==='select' && e.code==='Space') return;
@@ -3318,6 +3375,7 @@ const AutoAlign = (function(){
     if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code==='KeyZ' && edOn()){ e.preventDefault(); undo(); return; }
     if((e.ctrlKey || e.metaKey) && (e.code==='KeyY' || (e.shiftKey && e.code==='KeyZ')) && edOn()){ e.preventDefault(); redo(); return; }
     if(e.altKey && edOn() && (e.code==='ArrowLeft' || e.code==='ArrowRight')){ e.preventDefault(); nudge('l', e.code==='ArrowLeft' ? -0.1 : 0.1); return; }
+    if((e.code==='Home' || e.code==='End') && edOn() && !e.ctrlKey && S.starts.length){ e.preventDefault(); gotoFrame(e.code==='Home' ? 0 : S.starts.length-1); return; }
     const act = actionOf(e.code); if(!act) return;
     e.preventDefault();
     if(act==='next'){ if(S.mode==='rec') next(); else if(edOn()) gotoFrame(curI()+1); }
@@ -3491,6 +3549,7 @@ const AutoAlign = (function(){
   const OB = {i:0, steps:[
     {t:'Что делает AutoCut', h:'<p>AutoCut собирает видео из готовых картинок и озвучки. Вы говорите программе, на какой фразе какая картинка, а она делает из этого mp4 с субтитрами, движением, переходами и музыкой.</p><ul><li>Картинки можно делать в Gemini прямо из программы или добавить свои.</li><li>Текст и озвучка у вас уже есть. Программа сама расставит кадры по озвучке.</li><li>Всё собирается на вашем компьютере, видео никуда не отправляется.</li></ul>'},
     {t:'Подготовьте материалы', h:'<p>Для одного видео нужны три вещи:</p><ul><li><b>Картинки.</b> Названия с номерами (image_1.png, image_2.png и так далее), чтобы они встали по порядку.</li><li><b>Текст.</b> Файл .txt, одна строка на одну картинку. Количество строк должно совпадать с количеством картинок.</li><li><b>Озвучка.</b> Файл mp3, wav или m4a с голосом без музыки.</li></ul><p>Перетащите файлы в три окошка слева или нажмите на них. Если числа не совпадают, программа предупредит.</p>'},
+    {t:'Что нужно оплатить', h:'<p>Сама программа сборки видео работает без подписок. Платные только сервисы, из которых вы берёте картинки и голос:</p><ul><li><b>Картинки, Gemini.</b> Бесплатного лимита хватает на пару картинок, не на ролик. Для 180 картинок нужна подписка Google AI Plus (в Украине около 115-225 грн в месяц, цена зависит от страны).</li><li><b>Озвучка, ElevenLabs.</b> Бесплатно примерно 10 000 символов в месяц, но только для некоммерческого использования. Для монетизируемого канала нужен платный тариф: Starter около 6 долларов в месяц (3 ролика по 10 минут), Creator около 22 долларов (около 12 роликов).</li><li>Можно обойтись без них: свои картинки и свою запись голоса добавляются как обычные файлы.</li></ul><p>Цены меняются, всегда сверяйтесь с сайтами сервисов.</p>'},
     {t:'Разметка: где какая картинка', h:'<p>Нужно определить, в какую секунду начинается каждая строка. Есть три способа:</p><ul><li><b>Разметить по речи.</b> Самый точный. Сначала выберите язык озвучки (английский, испанский, немецкий, французский, хинди и другие). При первом запуске программа один раз скачает модуль распознавания речи (150–470 МБ в зависимости от языка и точности).</li><li><b>Разметить автоматически.</b> Быстро, по паузам в озвучке. Подходит, если голос читает с паузами между строками.</li><li><b>Начать запись.</b> Вручную: включаете озвучку и нажимаете Пробел на каждой новой строке.</li></ul><p>После разметки откроется редактор: границы кадров можно двигать мышью на шкале.</p>'},
     {t:'Оформление', h:'<p>Всё оформление настраивается в левой колонке:</p><ul><li><b>Субтитры.</b> Можно показывать по строке или по 2–4 слова, слово подсвечивается в момент произнесения.</li><li><b>Движение камеры, переходы, плёнка.</b> Зерно, виньетка, тряска и вспышка на кадрах со звуком.</li><li><b>Звуки на кадрах и музыка.</b> Кнопка «Звук» в редакторе, музыка приглушается под голос.</li><li><b>Голос.</b> Выравнивание громкости и сокращение долгих пауз.</li></ul><p>Когда настроили под канал, сохраните это как пресет кнопкой «+» в разделе «Пресет канала». Новые видео этого канала будут сразу выглядеть так же.</p>'},
     {t:'Сборка и всё после неё', h:'<ul><li><b>Проверить проект</b> найдёт пропавшие файлы и слишком длинные строки до того, как вы потратите время на сборку.</li><li><b>Разбор ритма</b> покажет слишком долгие кадры и места, где зритель может заскучать.</li><li><b>Собрать видео</b> можно целиком или сначала пробный кусок через «Просмотр результата».</li><li><b>Обложка, Главы, Shorts, Очередь.</b> Обложка 1280x720 с крупным текстом, главы для описания YouTube, вертикальные Shorts и сборка нескольких проектов подряд.</li><li><b>Резервная копия</b> сохранит проект со всеми файлами в выбранную папку.</li></ul>'},
@@ -3665,6 +3724,145 @@ const AutoAlign = (function(){
   $('gapGen').onclick = () => { gapSeedManual(); touch(); $('gapModal').classList.remove('on'); $('genOpen').click(); toast('Откройте Gemini и нажмите «Старт»: программа сделает только недостающие'); };
 
   
+
+
+  /* ---------- similar neighbouring pictures ---------- */
+  const SIM = {feat:null, pairs:[]};
+  function simLoad(url){ return new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = url; }); }
+  async function simFeatures(){
+    const n = Math.min(S.imgs.length, S.starts.length || S.imgs.length), W = 64, H = 36, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d', {willReadFrequently:true}), cache = {}, out = [];
+    for(let i = 0; i < n; i++){
+      const pth = S.imgs[i].path || S.imgs[i].url || '';
+      if(cache[pth]){ out.push(cache[pth]); continue; }
+      const im = await simLoad(S.imgs[i].url || (NATIVE && pth ? fileUrl(pth) : ''));
+      let f = null;
+      if(im){
+        g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(im, 0, 0, W, H);
+        const d = g.getImageData(0, 0, W, H).data, gray = new Float32Array(W*H);
+        for(let k = 0; k < W*H; k++) gray[k] = 0.299*d[k*4] + 0.587*d[k*4+1] + 0.114*d[k*4+2];
+        const sorted = Float32Array.from(gray).sort(), bg = sorted[Math.floor(sorted.length*0.6)];
+        const ink = new Uint8Array(W*H); let cnt = 0;
+        for(let k = 0; k < W*H; k++) if(bg - gray[k] > 45){ ink[k] = 1; cnt++; }
+        f = {gray, ink, cnt, thumb:cv.toDataURL('image/jpeg', 0.7)};
+        try{ const t = document.createElement('canvas'); t.width = 160; t.height = 90; t.getContext('2d').drawImage(im, 0, 0, 160, 90); f.thumb = t.toDataURL('image/jpeg', 0.75); }catch(e){}
+      }
+      cache[pth] = f; out.push(f);
+    }
+    return out;
+  }
+  function simScore(a, b){
+    if(!a || !b) return 0;
+    let diff = 0; for(let k = 0; k < a.gray.length; k++) diff += Math.abs(a.gray[k] - b.gray[k]);
+    const mad = diff / a.gray.length, pix = Math.max(0, 1 - mad/40);
+    if(a.cnt < 12 || b.cnt < 12) return pix;
+    const W = 64, H = 36; let inter = 0, uni = 0;
+    for(let y = 0; y < H; y++) for(let x = 0; x < W; x++){
+      const k = y*W + x; let ia = a.ink[k], ib = b.ink[k];
+      if(!ia){ for(let dy = -1; dy <= 1 && !ia; dy++) for(let dx = -1; dx <= 1; dx++){ const xx = x+dx, yy = y+dy; if(xx >= 0 && xx < W && yy >= 0 && yy < H && a.ink[yy*W+xx]){ ia = 1; break; } } }
+      if(!ib){ for(let dy = -1; dy <= 1 && !ib; dy++) for(let dx = -1; dx <= 1; dx++){ const xx = x+dx, yy = y+dy; if(xx >= 0 && xx < W && yy >= 0 && yy < H && b.ink[yy*W+xx]){ ib = 1; break; } } }
+      if((a.ink[k] && ib) || (b.ink[k] && ia)) inter++;
+      if(a.ink[k] || b.ink[k]) uni++;
+    }
+    return Math.min(1, Math.max(pix*0.5, uni ? inter/uni : pix));
+  }
+  function simShow(){
+    const th = +$('simTh').value/100; $('simThV').textContent = Math.round(th*100)+'%';
+    const L = $('simList'); L.innerHTML = '';
+    const hit = SIM.pairs.filter(p => p.sc >= th);
+    $('simSub').textContent = hit.length ? 'Найдено пар: '+hit.length+'. Зритель замечает, когда картинки повторяются, и видео выглядит шаблонным. Нажмите на пару, чтобы перейти к кадру.' : 'Похожих соседних кадров при такой строгости нет.';
+    hit.forEach(p => {
+      const row = document.createElement('div'); row.className = 'simrow'; row.style.cssText = 'display:flex;gap:8px;align-items:center;cursor:pointer;border:1px solid var(--line);border-radius:10px;padding:6px';
+      [p.a, p.b].forEach(i => { const im = document.createElement('img'); im.src = SIM.feat[i] ? SIM.feat[i].thumb : ''; im.style.cssText = 'width:160px;height:90px;object-fit:cover;border-radius:6px'; row.appendChild(im); });
+      const t = document.createElement('div'); t.textContent = 'Кадры '+(p.a+1)+' и '+(p.b+1)+': сходство '+Math.round(p.sc*100)+'%'+(p.same ? ' (один и тот же файл)' : ''); row.appendChild(t);
+      row.onclick = () => { $('simModal').classList.remove('on'); if(S.starts.length) gotoFrame(p.a); };
+      L.appendChild(row);
+    });
+  }
+  async function openSim(){
+    if(S.imgs.length < 2){ toast('Нужно хотя бы две картинки'); return; }
+    $('simSub').textContent = 'Сравниваю картинки…'; $('simList').innerHTML = ''; $('simModal').classList.add('on');
+    SIM.feat = await simFeatures(); SIM.pairs = [];
+    for(let i = 0; i < SIM.feat.length; i++) for(let j = i+1; j <= Math.min(i+2, SIM.feat.length-1); j++){
+      const same = (S.imgs[i].path && S.imgs[i].path === S.imgs[j].path);
+      const sc = same ? 1 : simScore(SIM.feat[i], SIM.feat[j]);
+      if(sc >= 0.5) SIM.pairs.push({a:i, b:j, sc, same});
+    }
+    SIM.pairs.sort((x,y) => y.sc - x.sc);
+    simShow();
+  }
+  $('simOpen').onclick = openSim; $('simClose').onclick = () => $('simModal').classList.remove('on'); $('simTh').oninput = simShow;
+
+
+  /* ---------- find a frame, shortcut list ---------- */
+  function fdRun(){
+    const q = $('fdQ').value.trim(), L = $('fdList'); L.innerHTML = '';
+    const n = Math.max(S.lines.length, S.imgs.length, S.starts.length);
+    if(!q){ $('fdInfo').textContent = 'Введите номер кадра (например 57) или часть фразы.'; return; }
+    if(/^\d+$/.test(q)){
+      const i = Math.min(n, Math.max(1, +q)) - 1;
+      $('fdInfo').textContent = 'Enter: перейти к кадру '+(i+1)+' из '+n+'.'; fdAdd(i); return;
+    }
+    const ql = q.toLowerCase(), hit = []; S.lines.forEach((t, i) => { if(String(t||'').toLowerCase().includes(ql)) hit.push(i); });
+    $('fdInfo').textContent = hit.length ? 'Найдено кадров: '+hit.length+'. Enter: перейти к первому.' : 'Ничего не найдено.';
+    hit.slice(0, 60).forEach(fdAdd);
+  }
+  function fdAdd(i){
+    const b = document.createElement('button'); b.className = 'btn fdres'; b.style.cssText = 'text-align:left;white-space:normal';
+    b.textContent = (i+1)+'. '+String(S.lines[i]||'(без текста)').slice(0, 140); b.onclick = () => fdGo(i); $('fdList').appendChild(b);
+  }
+  function fdGo(i){
+    $('fdModal').classList.remove('on'); $('fdQ').blur();
+    if(S.starts.length) gotoFrame(i); else toast('Кадр '+(i+1)+': разметки пока нет');
+  }
+  function fdOpen(){ au.pause(); $('fdModal').classList.add('on'); $('fdQ').value = ''; fdRun(); setTimeout(() => $('fdQ').focus(), 30); }
+  $('fdOpen').onclick = fdOpen; $('fdClose').onclick = () => { $('fdModal').classList.remove('on'); $('fdQ').blur(); }; $('fdQ').oninput = fdRun;
+  $('fdQ').onkeydown = e => { e.stopPropagation(); if(e.key==='Enter'){ const f = $('fdList').firstChild; if(f) f.click(); } if(e.key==='Escape'){ $('fdModal').classList.remove('on'); $('fdQ').blur(); } };
+  const HK = [['Пробел','Пауза и воспроизведение'],['Стрелки вправо и влево','Следующий и предыдущий кадр'],['Home и End','Первый и последний кадр'],['Ctrl+F','Поиск кадра по номеру или тексту'],['Ctrl+Z','Отменить в редакторе'],['Ctrl+Y или Ctrl+Shift+Z','Вернуть отменённое'],['Alt+стрелки','Сдвинуть границу кадра на 0.1 с'],['F','Полный экран'],['M','Выключить звук'],['?','Этот список']];
+  function hkOpen(){ const b = $('hkBody'); b.innerHTML = ''; HK.forEach(([k,d]) => { const a = document.createElement('b'); a.textContent = k; const c = document.createElement('span'); c.textContent = d; b.append(a, c); }); $('hkModal').classList.add('on'); }
+  $('hkOpen').onclick = hkOpen; $('hkClose').onclick = () => $('hkModal').classList.remove('on');
+  document.addEventListener('keydown', e => {
+    if(window.__licLocked || capturing) return;
+    if((e.ctrlKey || e.metaKey) && e.code==='KeyF' && VIEW==='work' && !document.querySelector('.modal.on')){ e.preventDefault(); fdOpen(); return; }
+    const tag = (e.target.tagName||'').toLowerCase();
+    if(e.key==='?' && tag!=='input' && tag!=='textarea' && !document.querySelector('.modal.on')){ e.preventDefault(); hkOpen(); }
+  });
+
+  /* ---------- channel intro / outro ---------- */
+  const BE_VID = /\.(mp4|mov|mkv|webm|avi|m4v)$/i;
+  let beWhich = 'intro';
+  const beState = () => { const c = curCh(); if(!c.be) c.be = {on:true, intro:null, outro:null}; return c.be; };
+  function beRender(){
+    const b = beState(); $('beOn').checked = !!b.on;
+    const box = $('beRows'); box.innerHTML = '';
+    [['intro','Заставка (в начале)'],['outro','Концовка (в конце)']].forEach(([k,l]) => {
+      const seg = b[k], row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap';
+      const nm = document.createElement('span'); nm.style.cssText = 'flex:1;min-width:150px'; nm.textContent = l+': '+(seg ? seg.name : 'не задана');
+      const pk = document.createElement('button'); pk.className = 'btn'; pk.textContent = seg ? 'Заменить' : 'Выбрать'; pk.dataset.be = k;
+      pk.onclick = () => { if(!NATIVE){ toast('Работает только в программе AutoCut для Windows'); return; } beWhich = k; $('beFile').click(); };
+      row.append(nm);
+      if(seg && seg.kind==='image'){
+        const d = document.createElement('input'); d.type = 'number'; d.min = 1; d.max = 30; d.step = 0.5; d.value = seg.dur || 3; d.style.width = '64px'; d.className = 'beDur'; d.dataset.be = k;
+        d.onchange = () => { seg.dur = Math.max(0.5, Math.min(30, +d.value || 3)); save(); };
+        row.append(d, document.createTextNode('с'));
+      }
+      row.append(pk);
+      if(seg){ const x = document.createElement('button'); x.className = 'btn'; x.textContent = 'Убрать'; x.onclick = () => { b[k] = null; save(); beRender(); }; row.append(x); }
+      box.appendChild(row);
+    });
+  }
+  $('beOpen').onclick = () => { beRender(); $('beModal').classList.add('on'); };
+  $('beClose').onclick = () => $('beModal').classList.remove('on');
+  $('beOn').onchange = e => { beState().on = e.target.checked; save(); };
+  $('beFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+    const p = NATIVE ? NATIVE.pathFor(f) : ''; if(!p){ toast('Не удалось получить путь к файлу'); return; }
+    const b = beState(); b[beWhich] = {path:p, name:f.name, kind:(BE_VID.test(f.name) || /^video\//.test(f.type)) ? 'video' : 'image', dur:3}; b.on = true; save(); beRender(); };
+  function beOpts(opts, vert, range){
+    const b = curCh().be; if(!b || !b.on || vert || range) return;
+    if(b.intro) opts.intro = {path:b.intro.path, kind:b.intro.kind, dur:b.intro.dur};
+    if(b.outro) opts.outro = {path:b.outro.path, kind:b.outro.kind, dur:b.outro.dur};
+  }
+
   /* ---------- release calendar ---------- */
   const CAL = {y:new Date().getFullYear(), m:new Date().getMonth()};
   const pad2 = n => (n<10?'0':'')+n;

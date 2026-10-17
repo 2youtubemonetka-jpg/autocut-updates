@@ -209,6 +209,47 @@ function audioArgs(opts, voicePath, total, voiceSs) {
 }
 
 // frames: [{path, duration, fx?, zoom?, tr?, text?, subs?: [{png(base64)|null, d}]}], frames[0].opts = {...}
+
+// channel intro / outro: a picture (shown for a few seconds) or a video file, joined to the finished video
+function hasAudioStream(bin, file, reg) {
+  return new Promise(resolve => {
+    let err = '';
+    const c = spawn(bin, ['-hide_banner', '-i', file, '-t', '0.1', '-f', 'null', '-'], { windowsHide: true });
+    if (reg) reg(c);
+    c.stderr.on('data', d => { err = (err + d.toString()).slice(-8000); });
+    c.on('error', () => resolve(false));
+    c.on('close', () => resolve(/Stream #\d+:\d+.*Audio:/.test(err)));
+  });
+}
+async function makeBookend(bin, seg, out, opts, reg) {
+  const enc = encArgs(false, opts.quality), isVid = seg.kind === 'video';
+  const dur = Math.max(0.5, Math.min(60, +seg.dur || 3));
+  const args = ['-y', '-hide_banner'];
+  let aud = false;
+  if (isVid) { aud = await hasAudioStream(bin, seg.path, reg); args.push('-t', String(dur), '-i', seg.path); }
+  else args.push('-loop', '1', '-framerate', String(FPS), '-t', String(dur), '-i', seg.path);
+  if (!aud) args.push('-f', 'lavfi', '-t', String(dur), '-i', 'anullsrc=r=48000:cl=stereo');
+  args.push('-vf', PLAIN, '-map', '0:v:0', '-map', aud ? '0:a:0' : '1:a:0');
+  if (aud) args.push('-af', 'aresample=48000,aformat=channel_layouts=stereo');
+  args.push(...enc, '-r', String(FPS), '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', '-t', String(dur), out);
+  await runFf(bin, args, null, reg);
+}
+async function addBookends(bin, outPath, opts, tmpRoot, reg) {
+  const parts = [];
+  if (opts.intro && opts.intro.path) { const o = path.join(tmpRoot, 'intro.mp4'); await makeBookend(bin, opts.intro, o, opts, reg); parts.push(o); }
+  parts.push(outPath);
+  if (opts.outro && opts.outro.path) { const o = path.join(tmpRoot, 'outro.mp4'); await makeBookend(bin, opts.outro, o, opts, reg); parts.push(o); }
+  if (parts.length < 2) return;
+  const tmpOut = path.join(tmpRoot, 'joined.mp4'), args = ['-y', '-hide_banner'];
+  parts.forEach(f => args.push('-i', f));
+  let g = '';
+  parts.forEach((f, i) => { g += '[' + i + ':v]setsar=1,fps=' + FPS + ',format=yuv420p[v' + i + '];[' + i + ':a]aresample=48000,aformat=channel_layouts=stereo[a' + i + '];'; });
+  g += parts.map((f, i) => '[v' + i + '][a' + i + ']').join('') + 'concat=n=' + parts.length + ':v=1:a=1[v][a]';
+  args.push('-filter_complex', g, '-map', '[v]', '-map', '[a]', ...encArgs(false, opts.quality), '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', tmpOut);
+  await runFf(bin, args, null, reg);
+  fs.copyFileSync(tmpOut, outPath);
+}
+
 function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
   const bin = ffmpeg || ffmpegPath();
   const opts = Object.assign({}, (frames[0] && frames[0].opts) || {});
@@ -351,6 +392,11 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
           const m = [...t.matchAll(/time=(\d+):(\d+):(\d+\.?\d*)/g)].pop();
           if (m && onProgress) onProgress(Math.min(1, 0.92 + 0.08 * (+m[1] * 3600 + +m[2] * 60 + parseFloat(m[3])) / dur));
         }, reg);
+      }
+      if (cancelled) throw new Error('cancelled');
+      if (!opts.range && !vertical && ((opts.intro && opts.intro.path) || (opts.outro && opts.outro.path))) {
+        try { await addBookends(bin, outPath, opts, tmpRoot, reg); encoderNote += ' +intro/outro'; }
+        catch (e) { if (cancelled) throw e; encoderNote += ' (intro/outro failed, video left without them: ' + String(e.message || e).split('\n')[0].slice(0, 160) + ')'; }
       }
       if (cancelled) throw new Error('cancelled');
       if (onProgress) onProgress(1);
