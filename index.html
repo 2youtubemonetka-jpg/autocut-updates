@@ -238,6 +238,9 @@
           <input type="file" id="fAud" accept="audio/*,.mp3,.wav,.m4a,.ogg"></label>
         <label class="drop" id="dTxt"><b>3. Текст по строкам</b><span id="sTxt"></span>
           <input type="file" id="fTxt" accept=".txt,text/plain"></label>
+        <button class="btn" id="ttsOpen" style="display:none;width:100%">Озвучить текст (ElevenLabs)</button>
+        <button class="btn" id="shOpen" style="display:none;width:100%">Shorts 9:16</button>
+        <button class="btn" id="qOpen" style="display:none;width:100%">Очередь рендера</button>
         <button class="btn" id="genOpen" style="display:none;width:100%" title="Программа сама сгенерирует картинки в Gemini по вашим промтам">Сгенерировать картинки (Gemini)</button>
       </div>
     </div>
@@ -331,6 +334,7 @@
     </div>
 
     <button class="big" id="start" disabled>Начать запись</button>
+    <button class="btn" id="asrBtn" style="display:none;width:100%;margin-top:-6px" title="Программа распознает речь и точно найдёт начало каждой строки (первый раз скачает модуль)">Разметить по речи (точно)</button>
     <button class="btn" id="auto" disabled style="width:100%;margin-top:-6px" title="Программа сама найдёт, где заканчивается каждая строка, по паузам в озвучке">Разметить автоматически</button>
 
     <div class="keys" id="keys"></div>
@@ -440,6 +444,38 @@
   </div>
 </div>
 
+<div class="modal" id="shModal"><div class="card">
+  <h2>Shorts 9:16</h2>
+  <p class="hint">Вертикальное видео 1080x1920 из этого же проекта: картинка по центру на размытом фоне, субтитры по центру.</p>
+  <div class="row" style="gap:8px"><label style="flex:1">Начало (м:сс)<input id="shStart" value="0:00" style="width:100%"></label>
+  <label style="flex:1">Длина<select id="shLen" style="width:100%"><option value="15">15 с</option><option value="30">30 с</option><option value="45" selected>45 с</option><option value="58">58 с</option></select></label></div>
+  <button class="btn primary" id="shGo1">Сделать один Short с этого места</button>
+  <button class="btn" id="shGoAll">Нарезать всё видео на Shorts</button>
+  <p class="hint" id="shMsg"></p>
+  <button class="btn" id="shClose">Закрыть</button>
+</div></div>
+<div class="modal" id="qModal"><div class="card">
+  <h2>Очередь рендера</h2>
+  <p class="hint">Отметьте проекты: они соберутся по очереди в одну папку.</p>
+  <div id="qList" style="max-height:260px;overflow:auto"></div>
+  <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="qShorts"> Ещё нарезать Shorts</label>
+  <label style="display:block;margin-top:6px">Длина Short<select id="qShLen"><option value="15">15 с</option><option value="30">30 с</option><option value="45" selected>45 с</option><option value="58">58 с</option></select></label>
+  <button class="btn primary" id="qGo">Запустить очередь</button>
+  <p class="hint" id="qMsg"></p>
+  <button class="btn" id="qClose">Закрыть</button>
+</div></div>
+<div class="modal" id="ttsModal"><div class="card">
+  <h2>Озвучка (ElevenLabs)</h2>
+  <p class="hint">Нужен ваш ключ API ElevenLabs. Он хранится только на этом компьютере.</p>
+  <input id="ttKey" type="password" placeholder="Ключ API" style="width:100%">
+  <button class="btn" id="ttLoad">Загрузить голоса</button>
+  <select id="ttVoice" style="width:100%"></select>
+  <select id="ttModel" style="width:100%"><option value="eleven_multilingual_v2">eleven_multilingual_v2</option><option value="eleven_turbo_v2_5">eleven_turbo_v2_5</option><option value="eleven_flash_v2_5">eleven_flash_v2_5</option></select>
+  <textarea id="ttText" rows="8" style="width:100%"></textarea>
+  <button class="btn primary" id="ttGo">Озвучить и добавить в проект</button>
+  <p class="hint" id="ttMsg"></p>
+  <button class="btn" id="ttClose">Закрыть</button>
+</div></div>
 <div class="modal" id="genModal">
   <div class="card" style="width:min(720px,94vw);max-height:92vh;overflow-y:auto">
     <h2>Генерация картинок в Gemini</h2>
@@ -601,12 +637,12 @@
   function trFor(i){ const t = S.tr; if(!t.on || i<1) return 0; const e = Math.max(1, parseInt(t.every,10)||1); return i % e === 0 ? (parseFloat(t.dur)||0.4) : 0; }
 
   // caption pictures: one strip per highlighted word
-  function capStates(i, dur){
+  function capStates(i, dur, vert){
     const text = S.lines[i] || ''; const ws = wordsOf(text); if(!ws.length) return null;
-    const size = parseInt(S.sb.size,10) || 56, Wd = 1920, Hs = Math.round(size*3.6 + 80);
+    const size = vert ? Math.round((parseInt(S.sb.size,10) || 56)*0.9) : (parseInt(S.sb.size,10) || 56), Wd = vert ? 1080 : 1920, Hs = Math.round(size*3.6 + 80);
     const c = document.createElement('canvas'); c.width = Wd; c.height = Hs; const g = c.getContext('2d');
     g.font = '700 '+size+'px "Segoe UI", Arial, sans-serif'; g.textBaseline = 'alphabetic';
-    const sp = g.measureText(' ').width, maxW = 1560, lines = []; let cur = [], cw = 0;
+    const sp = g.measureText(' ').width, maxW = vert ? 940 : 1560, lines = []; let cur = [], cw = 0;
     ws.forEach((w,k) => { const m = g.measureText(w).width; if(cur.length && cw + sp + m > maxW){ lines.push(cur); cur = []; cw = 0; } cur.push({w,k,m}); cw += (cur.length>1?sp:0) + m; });
     if(cur.length) lines.push(cur);
     const lh = size*1.25, y0 = Hs - 66 - (lines.length-1)*lh;
@@ -626,19 +662,20 @@
     const wt = W[i] && W[i].length === ws.length ? W[i] : ws.map(wWeight), sum = wt.reduce((a,b)=>a+b,0);
     return {strip:Hs, subs: ws.map((_,k) => ({png:draw(k), d:dur*wt[k]/sum}))};
   }
-  function blankStrip(h){ const c = document.createElement('canvas'); c.width = 1920; c.height = h; return c.toDataURL('image/png').split(',')[1]; }
-  function buildFrames(range){
+  function blankStrip(h, w){ const c = document.createElement('canvas'); c.width = w || 1920; c.height = h; return c.toDataURL('image/png').split(',')[1]; }
+  function buildFrames(range, xo){
+    xo = xo || {}; const vert = !!xo.vertical;
     const d = durations(); computeWeights();
     const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i], fx:fxFor(i), zoom:fxZoom(), tr:trFor(i), text:S.lines[i]||''}));
-    const opts = {srt:!!S.sb.srt && !range, burn:!!S.sb.burn, height:+((S.ql||QD()).res)||1080, quality:(S.ql||QD()).q, fadeIn:S.tr.fin?0.8:0, fadeOut:S.tr.fout?1.2:0};
+    const opts = {srt:!!S.sb.srt && !range && !vert, burn:!!S.sb.burn || vert, vertical:vert, height:+((S.ql||QD()).res)||1080, quality:(S.ql||QD()).q, fadeIn:S.tr.fin?0.8:0, fadeOut:S.tr.fout?1.2:0};
     if(S.mu.path) opts.music = {path:S.mu.path, vol:(S.mu.vol||20)/100, duck:+S.mu.duck, fade:+S.mu.fade};
-    if(S.sb.burn){
+    if(S.sb.burn || vert){
       let strip = 0;
       frames.forEach((f,i) => {
         if(range && (range.t0 > S.starts[i]+d[i] || range.t1 < S.starts[i])) return;
-        const r = capStates(i, d[i]); if(r){ f.subs = r.subs; strip = r.strip; }
+        const r = capStates(i, d[i], vert); if(r){ f.subs = r.subs; strip = r.strip; }
       });
-      opts.blankPng = blankStrip(strip || 200);
+      opts.blankPng = blankStrip(strip || 200, vert ? 1080 : 1920);
     }
     if(range) opts.range = range;
     frames[0].opts = opts;
@@ -773,8 +810,8 @@
     S.gen.text = $('gPrompts').value; touch();
     G.run = true; const tok = ++G.tok; const dead = () => tok !== G.tok; $('gStart').style.display = 'none'; $('gStop').style.display = '';
     try{
-      await genDirFor(); G.tmp = await NATIVE.gen.tmp(); await genConnect();
-      await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath: G.tmp, eventsEnabled:true});
+      await genDirFor(); G.tmp = await NATIVE.gen.tmp();
+      const needChrome = async () => { if(G.cdp) return; await genConnect(); await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath: G.tmp, eventsEnabled:true}); };
       const delay = parseInt($('gDelay').value,10) || 5; let fails = 0;
       for(let pass = 1; pass <= GEN.passes && !dead(); pass++){
         const left = []; const dn = await doneSet(); for(let n = 1; n <= prompts.length; n++) if(!dn.has(n)) left.push(n);
@@ -783,7 +820,9 @@
         for(const n of left){
           if(dead()) break;
           glog('Сцена '+n+' из '+prompts.length+': '+prompts[n-1].slice(0,50)+'…');
-          try{ await genScene(n, prompts[n-1], tok); glog('  сохранено '+imgName(n)); fails = 0; }
+          const cs = cardSpec(prompts[n-1]);
+          if(cs){ try{ await genCard(n, cs); glog('  карточка '+imgName(n)+' нарисована программой'); }catch(e){ glog('  карточка не вышла: '+e.message); } await genStat(); continue; }
+          try{ await needChrome(); await genScene(n, prompts[n-1], tok); glog('  сохранено '+imgName(n)); fails = 0; }
           catch(e){ if(dead()) break; fails++; glog('  не получилось: '+e.message+' (вернусь к ней в следующем круге)'); await gsleep(3000);
             if(fails >= 6 && /не найдено поле|Chrome/.test(e.message)){ glog('Слишком много ошибок подряд: проверьте окно Chrome и вход в Google. Останавливаюсь.'); G.tok++; break; } }
           await genStat();
@@ -1460,7 +1499,7 @@
     $('eRender').style.display = 'block';
     $('eBat').style.display = 'none'; $('eConcat').style.display = 'none';
     $('hintWeb').textContent = 'Нажмите «Собрать видео», выберите, куда сохранить. ffmpeg уже встроен в программу.';
-    NATIVE.onProgress(v => { $('rbar').style.width = (v*100)+'%'; $('rtxt').textContent = 'Собираю видео… '+Math.round(v*100)+'%'; });
+    NATIVE.onProgress(v => { if(progSink) return; $('rbar').style.width = (v*100)+'%'; $('rtxt').textContent = 'Собираю видео… '+Math.round(v*100)+'%'; });
     const doRender = async range => {
       let frames;
       try{ frames = buildFrames(range); }catch(err){ $('rwrap').style.display = 'block'; $('rtxt').textContent = 'Ошибка подготовки: '+err.message; return; }
@@ -1480,6 +1519,292 @@
     $('eTrial').style.display = 'block';
     $('eTrial').onclick = () => { const t0 = Math.max(0, Math.min(S.dur-1, au.currentTime || 0)); doRender({t0, t1:Math.min(S.dur, t0+20)}); };
     $('rCancel').onclick = () => NATIVE.cancel();
+  }
+
+  /* ====================== v3: text cards, Shorts, queue, voice-over, speech alignment ====================== */
+  const V3 = !!(NATIVE && NATIVE.v3);
+    const safeFile = n => String(n || 'video').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 60) || 'video';
+  const b64FromBytes = u8 => { let s = ''; for(let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+  const bytesFromB64 = b => { const s = atob(b), u = new Uint8Array(s.length); for(let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  /* ---- text cards: a line with [CARD: TEXT | SECOND LINE ; fg=yellow ; bg=navy] is drawn here, Gemini is not needed ---- */
+  const CARD_COLORS = {red:'#e63946', yellow:'#ffd60a', white:'#ffffff', black:'#0b0b0b', navy:'#0d1b3d', green:'#1fbf5b', blue:'#1d4ed8', gray:'#2b2f3a', orange:'#ff7a1a'};
+  function cardSpec(prompt){
+    const m = String(prompt||'').match(/\[CARD:\s*([^\]]+)\]/i); if(!m) return null;
+    const parts = m[1].split(';'), lines = parts[0].split('|').map(x => x.trim()).filter(Boolean), o = {};
+    parts.slice(1).forEach(p => { const k = p.split('='); if(k.length === 2) o[k[0].trim().toLowerCase()] = k[1].trim(); });
+    return lines.length ? {lines, fg:o.fg, bg:o.bg} : null;
+  }
+  const colorOf = (v, d) => { v = (v||'').toLowerCase(); return CARD_COLORS[v] || (/^#[0-9a-f]{3,8}$/.test(v) ? v : d); };
+  function drawCard(spec, W, H){
+    W = W || 1920; H = H || 1080;
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+    g.fillStyle = colorOf(spec.bg, '#101216'); g.fillRect(0, 0, W, H);
+    const face = '"Arial Black","Segoe UI Black",Impact,"Helvetica Neue",Arial,sans-serif';
+    let size = Math.round(H * 0.34);
+    const fit = () => { g.font = '900 '+size+'px '+face; return Math.max(...spec.lines.map(t => g.measureText(t).width)); };
+    while((fit() > W*0.88 || size*1.18*spec.lines.length > H*0.82) && size > 24) size -= 4;
+    const lh = size*1.18, y0 = H/2 - (spec.lines.length-1)*lh/2;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    spec.lines.forEach((t, i) => { const y = y0 + i*lh;
+      g.lineWidth = size*0.12; g.strokeStyle = '#000'; g.strokeText(t, W/2, y);
+      g.fillStyle = colorOf(spec.fg, '#ffd60a'); g.fillText(t, W/2, y); });
+    return c.toDataURL('image/png').split(',')[1];
+  }
+  async function genCard(n, spec){
+    if(!V3) throw new Error('Для карточек нужна новая версия программы: скачайте свежий AutoCut-Setup.exe');
+    const r = await NATIVE.writeFile(G.dir, imgName(n), drawCard(spec)); if(!r.ok) throw new Error(r.error || 'не удалось сохранить карточку');
+  }
+
+  /* ---- progress goes to whoever is rendering right now ---- */
+  let progSink = null;
+
+  /* ---- Shorts ---- */
+  const fmtT = t => { t = Math.max(0, Math.round(t)); return Math.floor(t/60)+':'+String(t%60).padStart(2,'0'); };
+  function splitShorts(maxLen){
+    const st = S.starts, n = st.length, end = i => i < n-1 ? st[i+1] : S.dur, parts = []; let i = 0;
+    while(i < n){
+      let t0 = st[i], j = i;
+      while(j+1 < n && end(j+1) - t0 <= maxLen) j++;
+      let t1 = Math.min(end(j), t0 + maxLen);
+      parts.push({t0, t1}); i = j+1;
+    }
+    return parts.filter(p => p.t1 - p.t0 >= 5);
+  }
+  function shortOpts(){ return {vertical:true}; }
+  async function renderJob(label, frames, outPath, setStatus){
+    progSink = v => setStatus(label+' '+Math.round(v*100)+'%');
+    setStatus(label+' 0%');
+    const r = await NATIVE.render({frames, audioPath:S.audioPath, outPath});
+    progSink = null; return r;
+  }
+  function openShorts(){
+    if(!V3){ toast('Shorts доступны в новой версии программы (нужна переустановка)'); return; }
+    if(!S.starts.length || !S.audioPath){ toast('Сначала расставьте кадры и добавьте озвучку'); return; }
+    $('shStart').value = fmtT(au.currentTime||0); $('shMsg').textContent = ''; $('shModal').classList.add('on');
+  }
+  const parseT = v => { const m = String(v).trim().match(/^(\d+):(\d{1,2})$/); return m ? +m[1]*60 + +m[2] : (parseFloat(v) || 0); };
+  async function shortsRun(ranges){
+    const dir = await NATIVE.pickDir('Куда сохранить Shorts'); if(!dir) return;
+    const sep = /\\/.test(dir) ? '\\' : '/', base = safeFile((findTab(activeId)||{t:{}}).t.name);
+    $('shGo1').disabled = $('shGoAll').disabled = true; let ok = 0;
+    for(let k = 0; k < ranges.length; k++){
+      const r = ranges[k], frames = buildFrames({t0:r.t0, t1:r.t1}, shortOpts());
+      const out = dir + sep + base + '_short_' + String(k+1).padStart(2,'0') + '.mp4';
+      const res = await renderJob('Shorts '+(k+1)+' из '+ranges.length+' ('+fmtT(r.t0)+'-'+fmtT(r.t1)+')', frames, out, t => $('shMsg').textContent = t);
+      if(res.ok) ok++; else { $('shMsg').textContent = 'Ошибка: '+(res.error||''); break; }
+    }
+    $('shGo1').disabled = $('shGoAll').disabled = false;
+    if(ok === ranges.length){ $('shMsg').textContent = 'Готово: '+ok+' файл(ов) в папке '+dir; NATIVE.showItem(dir); }
+  }
+
+  /* ---- render queue: several projects in a row ---- */
+  function queueCandidates(){
+    const out = [];
+    DB.channels.forEach(c => openTabs(c).forEach(t => { const sum = t.sum || {}; out.push({id:t.id, name:t.name || 'Без названия', channel:c.name, ready: !!(sum.rec > 1 && sum.audio && sum.n), sum}); }));
+    return out;
+  }
+  function openQueue(){
+    if(!V3){ toast('Очередь доступна в новой версии программы (нужна переустановка)'); return; }
+    if(activeId) saveProject(activeId);
+    const box = $('qList'); box.innerHTML = '';
+    queueCandidates().forEach(it => {
+      const row = document.createElement('label'); row.className = 'chk'; row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:4px 0';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = it.id; cb.disabled = !it.ready; cb.checked = it.ready && it.id === activeId;
+      const tx = document.createElement('span'); tx.style.cssText = 'flex:1;min-width:0'; tx.textContent = it.channel+': '+it.name+(it.ready ? '' : '  (не размечен)');
+      const st = document.createElement('span'); st.className = 'hint'; st.style.margin = '0'; st.id = 'qs_'+it.id;
+      row.append(cb, tx, st); box.appendChild(row);
+    });
+    $('qMsg').textContent = ''; $('qModal').classList.add('on');
+  }
+  let qBusy = false;
+  async function runQueue(){
+    if(qBusy) return;
+    const ids = [...$('qList').querySelectorAll('input:checked')].map(x => x.value); if(!ids.length){ toast('Отметьте хотя бы один проект'); return; }
+    const dir = await NATIVE.pickDir('Куда сохранить готовые видео'); if(!dir) return;
+    const sep = /\\/.test(dir) ? '\\' : '/', origin = activeId, withShorts = $('qShorts').checked, shLen = parseInt($('qShLen').value, 10) || 45;
+    qBusy = true; $('qGo').disabled = true; let done = 0;
+    for(const id of ids){
+      const st = $('qs_'+id); const set = t => { if(st) st.textContent = t; $('qMsg').textContent = t; };
+      try{
+        switchTab(id); await sleep(500);
+        if(!S.audioPath || S.starts.length < 2 || S.imgs.some(i => !i.path)){ set('пропущен: нет файлов'); continue; }
+        const nm = safeFile((findTab(id)||{t:{}}).t.name);
+        const res = await renderJob('сборка', buildFrames(null), dir + sep + nm + '.mp4', set);
+        if(!res.ok){ set('ошибка: '+(res.error||'').slice(0,80)); continue; }
+        S.rendered = true; saveProject(id); set('готово');
+        if(withShorts){ const parts = splitShorts(shLen);
+          for(let k = 0; k < parts.length; k++){
+            const r2 = await renderJob('Shorts '+(k+1)+'/'+parts.length, buildFrames({t0:parts[k].t0, t1:parts[k].t1}, shortOpts()), dir + sep + nm + '_short_' + String(k+1).padStart(2,'0') + '.mp4', set);
+            if(!r2.ok){ set('Shorts: ошибка'); break; } }
+          set('готово + Shorts'); }
+        done++;
+      }catch(e){ set('ошибка: '+(e.message||e)); }
+    }
+    if(origin && findTab(origin)) switchTab(origin);
+    qBusy = false; $('qGo').disabled = false; $('qMsg').textContent = 'Очередь завершена: собрано проектов '+done+' из '+ids.length; if(done) NATIVE.showItem(dir);
+  }
+
+  /* ---- voice-over (ElevenLabs, with the user's own key) ---- */
+  const TTS = {
+    base: (() => { try{ return localStorage.getItem('autocut.ttsurl') || 'https://api.elevenlabs.io'; }catch(e){ return 'https://api.elevenlabs.io'; } })(),
+    get(k, d){ try{ return localStorage.getItem('autocut.tts.'+k) || d; }catch(e){ return d; } },
+    set(k, v){ try{ localStorage.setItem('autocut.tts.'+k, v); }catch(e){} }
+  };
+  async function ttsVoices(){
+    const key = $('ttKey').value.trim(); if(!key){ $('ttMsg').textContent = 'Вставьте ключ ElevenLabs'; return; }
+    $('ttMsg').textContent = 'Загружаю список голосов…';
+    const r = await NATIVE.request({url:TTS.base+'/v1/voices', headers:{'xi-api-key':key}});
+    if(!r.ok || r.status !== 200){ $('ttMsg').textContent = r.ok ? 'Ключ не принят (код '+r.status+')' : 'Нет связи: '+r.error; return; }
+    const j = JSON.parse(new TextDecoder().decode(bytesFromB64(r.body))), sel = $('ttVoice'); sel.innerHTML = '';
+    (j.voices||[]).forEach(v => { const o = document.createElement('option'); o.value = v.voice_id; o.textContent = v.name + (v.category ? ' ('+v.category+')' : ''); sel.appendChild(o); });
+    const last = TTS.get('voice', ''); if(last) sel.value = last; TTS.set('key', key);
+    $('ttMsg').textContent = 'Голосов: '+(j.voices||[]).length;
+  }
+  function ttsChunks(text, max){
+    const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean), out = []; let cur = '';
+    lines.forEach(l => { if(cur && (cur+' '+l).length > max){ out.push(cur); cur = l; } else cur = cur ? cur+' '+l : l; });
+    if(cur) out.push(cur); return out;
+  }
+  async function ttsRun(){
+    const key = $('ttKey').value.trim(), voice = $('ttVoice').value, model = $('ttModel').value, text = $('ttText').value;
+    if(!key || !voice || !text.trim()){ $('ttMsg').textContent = 'Нужны ключ, голос и текст'; return; }
+    TTS.set('key', key); TTS.set('voice', voice); TTS.set('model', model);
+    const chunks = ttsChunks(text, 2400), parts = []; $('ttGo').disabled = true;
+    for(let i = 0; i < chunks.length; i++){
+      $('ttMsg').textContent = 'Озвучиваю часть '+(i+1)+' из '+chunks.length+'…';
+      let r = null;
+      for(let attempt = 0; attempt < 3; attempt++){
+        r = await NATIVE.request({url:TTS.base+'/v1/text-to-speech/'+encodeURIComponent(voice)+'?output_format=mp3_44100_128', method:'POST',
+          headers:{'xi-api-key':key,'Content-Type':'application/json','Accept':'audio/mpeg'}, body:JSON.stringify({text:chunks[i], model_id:model}), timeout:180000});
+        if(r.ok && r.status === 200) break; if(r.ok && r.status < 500 && r.status !== 429) break; await sleep(2500);
+      }
+      if(!r.ok || r.status !== 200){
+        let why = r.ok ? 'код '+r.status : r.error; try{ if(r.ok) why += ': '+new TextDecoder().decode(bytesFromB64(r.body)).slice(0,160); }catch(e){}
+        $('ttMsg').textContent = 'Ошибка: '+why; $('ttGo').disabled = false; return;
+      }
+      parts.push(bytesFromB64(r.body));
+    }
+    const tot = parts.reduce((s, p) => s + p.length, 0), all = new Uint8Array(tot); let o = 0; parts.forEach(p => { all.set(p, o); o += p.length; });
+    await genDirFor();
+    const w = await NATIVE.writeFile(G.dir, 'voice.mp3', b64FromBytes(all));
+    $('ttGo').disabled = false; if(!w.ok){ $('ttMsg').textContent = 'Не удалось сохранить: '+w.error; return; }
+    useAudioPath(w.path, 'voice.mp3'); $('ttMsg').textContent = 'Готово: озвучка добавлена в проект'; toast('Озвучка готова'); $('ttsModal').classList.remove('on');
+  }
+  function useAudioPath(p, name){
+    if(S.audioUrl && /^blob:/.test(S.audioUrl)) try{ URL.revokeObjectURL(S.audioUrl); }catch(e){}
+    S.peaks = null; S.peaksBusy = false; S.audioFile = null; S.audioPath = p; S.audioName = name; S.audioUrl = fileUrl(p) + '?t=' + Date.now(); S.dur = 0;
+    au.src = S.audioUrl; renderFiles(); touch();
+  }
+
+  /* ---- exact alignment by speech recognition (whisper.cpp, downloaded once on first use) ---- */
+  const ASR = {
+    lang: () => { try{ return localStorage.getItem('autocut.asrlang') || 'en'; }catch(e){ return 'en'; } },
+    model: () => ASR.lang() === 'en' ? 'ggml-base.en.bin' : 'ggml-base.bin',
+    exe: ['whisper-cli.exe', 'whisper-cli', 'main.exe']
+  };
+  async function asrEnsure(say){
+    let exe = await NATIVE.tool.find('whisper', ASR.exe);
+    if(!exe){
+      say('Скачиваю модуль распознавания речи (один раз)…');
+      const rel = await NATIVE.request({url:'https://api.github.com/repos/ggml-org/whisper.cpp/releases/latest', headers:{'User-Agent':'AutoCut','Accept':'application/vnd.github+json'}});
+      if(!rel.ok || rel.status !== 200) throw new Error('Не удалось получить список версий (код '+(rel.status||rel.error)+')');
+      const j = JSON.parse(new TextDecoder().decode(bytesFromB64(rel.body)));
+      const a = (j.assets||[]).find(x => /^whisper-bin-x64\.zip$/i.test(x.name)) || (j.assets||[]).find(x => /bin.*x64.*\.zip$/i.test(x.name) && !/cublas|blas/i.test(x.name));
+      if(!a) throw new Error('Не нашёл сборку для Windows в релизе');
+      const d = await NATIVE.tool.download({url:a.browser_download_url, rel:'whisper/whisper.zip', unzip:'x'});
+      if(!d.ok) throw new Error('Загрузка модуля: '+d.error);
+      exe = await NATIVE.tool.find('whisper', ASR.exe); if(!exe) throw new Error('В архиве нет whisper-cli');
+    }
+    const mrel = 'models/'+ASR.model();
+    if(!(await NATIVE.tool.has(mrel))){
+      say('Скачиваю модель распознавания (около 150 МБ, один раз)…');
+      const d = await NATIVE.tool.download({url:'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'+ASR.model(), rel:mrel});
+      if(!d.ok) throw new Error('Загрузка модели: '+d.error);
+    }
+    return {exe, model:mrel};
+  }
+  function normW(w){ return String(w||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+  function parseWhisper(json){
+    const words = [];
+    (json.transcription || []).forEach(seg => {
+      const raw = String(seg.text||''); if(/^\s*\[.*\]\s*$/.test(raw) || !raw.trim()) return;
+      const t = (seg.offsets && seg.offsets.from != null) ? seg.offsets.from/1000 : 0;
+      const w = normW(raw); if(!w) return;
+      if(!/^\s/.test(raw) && words.length && !/[.,!?;:]$/.test(words[words.length-1].raw)) { words[words.length-1].w += w; words[words.length-1].raw += raw; }
+      else words.push({w, t, raw});
+    });
+    return words;
+  }
+  function alignWords(lines, asr){
+    const script = []; lines.forEach((l, li) => wordsOf(l).forEach(w => { const n = normW(w); if(n) script.push({n, li}); }));
+    const A = script.map(x => x.n), B = asr.map(x => x.w), n = A.length, m = B.length;
+    if(!n || !m) return null;
+    const MATCH = 2, MIS = -1, GAP = -1, D = new Int16Array((n+1)*(m+1)), idx = (i, j) => i*(m+1)+j;
+    for(let i = 1; i <= n; i++) D[idx(i,0)] = i*GAP; for(let j = 1; j <= m; j++) D[idx(0,j)] = j*GAP;
+    for(let i = 1; i <= n; i++) for(let j = 1; j <= m; j++){
+      const s = A[i-1] === B[j-1] ? MATCH : (A[i-1].slice(0,3) === B[j-1].slice(0,3) && A[i-1].length > 3 ? 0 : MIS);
+      D[idx(i,j)] = Math.max(D[idx(i-1,j-1)] + s, D[idx(i-1,j)] + GAP, D[idx(i,j-1)] + GAP);
+    }
+    const time = new Array(n).fill(null); let i = n, j = m, matched = 0;
+    while(i > 0 && j > 0){
+      const s = A[i-1] === B[j-1] ? MATCH : (A[i-1].slice(0,3) === B[j-1].slice(0,3) && A[i-1].length > 3 ? 0 : MIS);
+      if(D[idx(i,j)] === D[idx(i-1,j-1)] + s){ if(A[i-1] === B[j-1]){ time[i-1] = asr[j-1].t; matched++; } i--; j--; }
+      else if(D[idx(i,j)] === D[idx(i-1,j)] + GAP) i--; else j--;
+    }
+    // fill the gaps by interpolation between known words
+    let prev = -1;
+    for(let k = 0; k <= n; k++){
+      if(k < n && time[k] == null) continue;
+      if(k - prev > 1){ const t0 = prev >= 0 ? time[prev] : 0, t1 = k < n ? time[k] : (asr[m-1].t + 0.4);
+        for(let q = prev+1; q < k; q++) time[q] = t0 + (t1 - t0) * (q - prev) / (k - prev); }
+      prev = k;
+    }
+    const starts = new Array(lines.length).fill(null);
+    script.forEach((x, k) => { if(starts[x.li] == null) starts[x.li] = time[k]; });
+    let last = 0; for(let li = 0; li < starts.length; li++){ if(starts[li] == null) starts[li] = last + 0.5; if(li > 0) starts[li] = Math.max(starts[li] - 0.04, last + 0.3); last = starts[li]; }
+    starts[0] = 0;
+    return {starts, matched, total:n};
+  }
+  async function asrRun(){
+    if(!V3){ toast('Нужна новая версия программы (переустановка)'); return; }
+    if(!S.audioPath || S.lines.length !== S.imgs.length || !S.imgs.length){ toast('Нужны озвучка, текст и картинки в одинаковом числе строк'); return; }
+    if(S.starts.length>1 && S.mode!=='idle' && !confirm('Старая разметка этого проекта будет заменена. Продолжить?')) return;
+    const say = t => { $('msg').textContent = t; }; $('asrBtn').disabled = true;
+    try{
+      const tool = await asrEnsure(say);
+      say('Подготавливаю звук…');
+      const tmp = await NATIVE.gen.tmp(), sep = /\\/.test(tmp) ? '\\' : '/', wav = tmp + sep + 'asr_in.wav', base = tmp + sep + 'asr_out';
+      const f1 = await NATIVE.tool.run({exe:'ffmpeg', args:['-y','-i',S.audioPath,'-ar','16000','-ac','1','-c:a','pcm_s16le',wav]});
+      if(!f1.ok) throw new Error('ffmpeg: '+(f1.err||f1.error||'').slice(-200));
+      say('Распознаю речь, это займёт несколько минут…');
+      const tdir = await NATIVE.tool.dir();
+      const w = await NATIVE.tool.run({exe:tool.exe, args:['-m', tdir + sep + tool.model.replace(/\//g, sep), '-f', wav, '-oj', '-of', base, '-ml', '1', '-sow', '-l', ASR.lang()], timeout:3600000});
+      if(!w.ok) throw new Error('распознавание не удалось: '+((w.err||w.error||'')+'').slice(-200));
+      const rd = await NATIVE.readFile(base + '.json'); if(!rd) throw new Error('нет результата распознавания');
+      const words = parseWhisper(JSON.parse(new TextDecoder().decode(bytesFromB64(rd))));
+      const res = alignWords(S.lines, words); if(!res) throw new Error('речь не распознана');
+      S.starts = res.starts; S.idx = 0; S.pos = 0; S.rendered = false; S.autoInfo = {found:res.matched, guessed:res.total - res.matched};
+      setMode('done', 'Точная разметка готова: проверьте в просмотре');
+      say('Готово. Слов совпало с текстом: '+res.matched+' из '+res.total+'.'); toast('Разметка по речи готова. Запускаю просмотр'); renderFiles(); review();
+    }catch(e){ say('Не удалось разметить по речи: '+(e.message||e)); }
+    $('asrBtn').disabled = false;
+  }
+
+  /* ---- wiring ---- */
+  if(NATIVE){
+    NATIVE.onProgress(v => { if(progSink) progSink(v); });
+    $('shOpen').style.display = ''; $('qOpen').style.display = ''; $('ttsOpen').style.display = ''; $('asrBtn').style.display = '';
+    $('shOpen').onclick = openShorts; $('qOpen').onclick = openQueue;
+    $('shClose').onclick = () => $('shModal').classList.remove('on'); $('qClose').onclick = () => { if(!qBusy) $('qModal').classList.remove('on'); };
+    $('shGo1').onclick = () => { const t0 = parseT($('shStart').value), len = parseInt($('shLen').value, 10) || 45; shortsRun([{t0, t1:Math.min(S.dur, t0+len)}]); };
+    $('shGoAll').onclick = () => shortsRun(splitShorts(parseInt($('shLen').value, 10) || 45));
+    $('qGo').onclick = runQueue;
+    $('asrBtn').onclick = asrRun;
+    $('ttsOpen').onclick = () => { if(!V3){ toast('Озвучка доступна в новой версии программы (нужна переустановка)'); return; }
+      $('ttKey').value = TTS.get('key', ''); $('ttModel').value = TTS.get('model', 'eleven_multilingual_v2'); $('ttText').value = S.lines.join('\n'); $('ttMsg').textContent = ''; $('ttsModal').classList.add('on'); if($('ttKey').value) ttsVoices(); };
+    $('ttLoad').onclick = ttsVoices; $('ttGo').onclick = ttsRun; $('ttClose').onclick = () => $('ttsModal').classList.remove('on');
   }
 
   /* ---------- rebindable keys ---------- */

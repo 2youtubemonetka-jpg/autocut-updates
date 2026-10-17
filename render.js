@@ -152,7 +152,8 @@ function audioArgs(opts, voicePath, total, voiceSs) {
 function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
   const bin = ffmpeg || ffmpegPath();
   const opts = Object.assign({}, (frames[0] && frames[0].opts) || {});
-  const GEO = { 720: [1280, 720], 1080: [1920, 1080], 1440: [2560, 1440], 2160: [3840, 2160] }[+opts.height] || [1920, 1080];
+  const vertical = !!opts.vertical;
+  const GEO = vertical ? [1920, 1080] : { 720: [1280, 720], 1080: [1920, 1080], 1440: [2560, 1440], 2160: [3840, 2160] }[+opts.height] || [1920, 1080];
   setGeom(GEO[0], GEO[1]);
   const Q = { fast: ['veryfast', '24'], normal: ['veryfast', '20'], high: ['medium', '16'] }[opts.quality] || ['veryfast', '20'];
   const kids = new Set();
@@ -180,7 +181,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'autocut_'));
     const aa = audioArgs(opts, audioPath, total, voiceSs);
     try {
-      if (!hasFx && !hasTr && !hasSubs) {
+      if (!hasFx && !hasTr && !hasSubs && !vertical) {
         // fast path: one pass, still images through the concat demuxer
         const list = path.join(tmpRoot, 'list.txt');
         fs.writeFileSync(list, buildConcat(fr), 'utf8');
@@ -239,11 +240,18 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
               g.push('[' + idx + ':v]' + chain + ',trim=end_frame=' + F + ',setpts=PTS-STARTPTS,fade=t=out:st=0:d=' + (F / FPS).toFixed(3) + ':alpha=1[b0]');
               g.push('[' + cur + '][b0]overlay=0:0:eof_action=pass:format=auto[a1]'); cur = 'a1'; idx++;
             }
+            // vertical (Shorts): the 16:9 picture sits in the middle of a blurred copy of itself
+            if (vertical) {
+              g.push('[' + cur + ']format=yuv420p,split=2[vv1][vv2]');
+              g.push('[vv1]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:3[vbg]');
+              g.push('[vv2]scale=1080:-2[vfg]');
+              g.push('[vbg][vfg]overlay=0:(H-h)/2[vw]'); cur = 'vw';
+            }
             // captions
             if (subLists[i]) {
               args.push('-f', 'concat', '-safe', '0', '-i', subLists[i]);
               g.push('[' + idx + ':v]format=rgba' + (VW !== 1920 ? ',scale=' + VW + ':-2:flags=lanczos' : '') + '[s0]');
-              g.push('[' + cur + '][s0]overlay=0:H-h:eof_action=pass:format=auto[a2]'); cur = 'a2'; idx++;
+              g.push('[' + cur + '][s0]overlay=0:' + (vertical ? '(H-h)/2' : 'H-h') + ':eof_action=pass:format=auto[a2]'); cur = 'a2'; idx++;
             }
             // fade from / to black on the first / last clip
             let tailChain = 'format=yuv420p';
