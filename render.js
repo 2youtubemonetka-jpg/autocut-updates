@@ -14,6 +14,19 @@ function ffmpegPath(){
   return 'ffmpeg';
 }
 
+function clipKey(payload) {
+  const h = require('crypto').createHash('sha1');
+  h.update(JSON.stringify(payload, (k, v) => (typeof v === 'string' && v.length > 256 ? v.length + ':' + v.slice(0, 64) + ':' + v.slice(-64) : v)));
+  return h.digest('hex').slice(0, 20);
+}
+function purgeResume(root, keep) {   // cached clips of old failed renders are removed after three days
+  try {
+    for (const d of fs.readdirSync(root)) {
+      if (d === keep) continue; const p = path.join(root, d);
+      try { if (Date.now() - fs.statSync(p).mtimeMs > 3 * 86400000) fs.rmSync(p, { recursive: true, force: true }); } catch (_) {}
+    }
+  } catch (_) {}
+}
 function esc(p){ return p.replace(/\\/g, '/').replace(/'/g, "'\\''"); }
 
 function buildConcat(frames){
@@ -310,6 +323,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
     try { fs.writeFileSync(outPath.replace(/\.[^.\\/]+$/, '') + '_log.txt', 'AutoCut render log\n' + new Date().toISOString() + '\nframes=' + fr.length + ' subs=' + hasSubs + ' transitions=' + hasTr + ' fx=' + hasFx + ' film=' + !!film + '\nopts=' + JSON.stringify(Object.assign({}, opts, { blankPng: opts.blankPng ? 'yes' : '' })) + '\nos=' + process.platform + ' tmp=' + os.tmpdir() + '\n', 'utf8'); } catch (_) {}
     if (opts.normVoice) { opts.normMeasured = await measureLoud(bin, audioPath, reg); if (cancelled) throw new Error('cancelled'); }
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'autocut_'));
+    let cacheDir = null, reused = 0;
     // if the loudness filter chain fails on some ffmpeg build, the same step is repeated without it
     const audioRetry = async build => {
       try { if (process.env.AUTOCUT_FAIL_NORM && opts.normVoice) throw new Error('Cannot select channel layout (test hook)'); await build(); }
@@ -343,7 +357,13 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
         let acc = 0; const counts = [];
         for (const f of fr) { const a0 = Math.round(acc * FPS); acc += f.duration; counts.push(Math.max(1, Math.round(acc * FPS) - a0)); }
         const nFrames = counts.reduce((a, b) => a + b, 0);
-        const clips = fr.map((_, i) => path.join(tmpRoot, 'c' + String(i).padStart(4, '0') + '.mp4'));
+        // finished clips are kept in a folder named after everything that shapes them: after a failure the next run reuses them
+        const stat = f => { try { const t = fs.statSync(f); return t.size + ':' + Math.round(t.mtimeMs); } catch (_) { return ''; } };
+        const resumeRoot = path.join(os.tmpdir(), 'autocut_resume');
+        const key = clipKey({ fr: fr.map(f => Object.assign({}, f, { opts: undefined })), st: fr.map(f => stat(f.path)), film, vertical, q: opts.quality, fadeIn, fadeOutV, W: VW, H: VH, counts });
+        cacheDir = path.join(resumeRoot, key); fs.mkdirSync(cacheDir, { recursive: true }); try { fs.utimesSync(cacheDir, new Date(), new Date()); } catch (_) {}
+        purgeResume(resumeRoot, key);
+        const clips = fr.map((_, i) => path.join(cacheDir, 'c' + String(i).padStart(4, '0') + '.mp4'));
         // caption pictures -> files
         let blank = null;
         if (hasSubs) {
@@ -366,6 +386,10 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
         const worker = async () => {
           while (next < fr.length && !cancelled) {
             const i = next++, f = fr[i], N = counts[i];
+            const marker = clips[i].replace(/\.mp4$/, '.ok'), tag = hw ? 'hw' : 'cpu';
+            try { if (fs.existsSync(clips[i]) && fs.readFileSync(marker, 'utf8') === tag) { reused++; done++; if (onProgress) onProgress(0.92 * done / fr.length); continue; } } catch (_) {}
+            try { fs.unlinkSync(marker); } catch (_) {}
+            if (process.env.AUTOCUT_FAIL_AT && i === +process.env.AUTOCUT_FAIL_AT) throw new Error('test hook: clip ' + i);
             const args = ['-y', '-hide_banner', '-nostats'];
             const g = [];                                 // filter_complex pieces
             let idx = 0;
@@ -381,8 +405,25 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
               const p = fr[i - 1];
               args.push('-loop', '1', '-framerate', String(FPS), '-i', p.path);
               const chain = p.fx ? fxEndFilter(p.fx, p.zoom || 1.2) : (FIT + ',format=yuva420p');
-              g.push('[' + idx + ':v]' + chain + ',trim=end_frame=' + F + ',setpts=PTS-STARTPTS,fade=t=out:st=0:d=' + (F / FPS).toFixed(3) + ':alpha=1[b0]');
-              g.push('[' + cur + '][b0]overlay=0:0:eof_action=pass:format=auto[a1]'); cur = 'a1'; idx++;
+              const style = f.trs || 'fade', D = (F / FPS).toFixed(3);
+              if (style === 'black' || style === 'white') {
+                // the old picture fades away over a flat colour, then the new one fades in from it
+                const H2 = Math.max(1, Math.floor(F / 2)), d2 = (H2 / FPS).toFixed(3);
+                g.push('[' + idx + ':v]' + chain + ',trim=end_frame=' + H2 + ',setpts=PTS-STARTPTS,fade=t=out:st=0:d=' + d2 + ':alpha=1[b0]');
+                g.push('[' + cur + ']format=yuv420p,fade=t=in:st=' + d2 + ':d=' + d2 + ':color=' + style + '[a0f]');
+                g.push('[a0f][b0]overlay=0:0:eof_action=pass:format=auto[a1]');
+              } else if (style === 'slide') {
+                g.push('[' + idx + ':v]' + chain + ',trim=end_frame=' + F + ',setpts=PTS-STARTPTS[b0]');
+                g.push('[' + cur + '][b0]overlay=x=\'-w*min(t/' + D + ',1)\':y=0:eof_action=pass:format=auto[a1]');
+              } else if (style === 'glitch') {
+                // a few frames of the old picture, torn sideways and noisy
+                g.push('[' + idx + ':v]' + chain + ',trim=end_frame=' + F + ',setpts=PTS-STARTPTS,noise=alls=45:allf=t[b0]');
+                g.push('[' + cur + '][b0]overlay=x=\'if(lt(mod(n,4),2),26,-20)\':y=\'if(lt(mod(n,3),1),0,8)\':eof_action=pass:format=auto:enable=\'lt(mod(n,5),3)\'[a1]');
+              } else {
+                g.push('[' + idx + ':v]' + chain + ',trim=end_frame=' + F + ',setpts=PTS-STARTPTS,fade=t=out:st=0:d=' + D + ':alpha=1[b0]');
+                g.push('[' + cur + '][b0]overlay=0:0:eof_action=pass:format=auto[a1]');
+              }
+              cur = 'a1'; idx++;
             }
             // vertical (Shorts): the 16:9 picture sits in the middle of a blurred copy of itself
             if (vertical) {
@@ -409,6 +450,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
             g.push('[' + cur + ']' + tailChain + '[vout]');
             args.push('-filter_complex', g.join(';'), '-map', '[vout]', ...encArgs(hw, opts.quality), '-r', String(FPS), '-an', '-frames:v', String(N), clips[i]);
             await runFf(bin, args, null, reg);
+            try { fs.writeFileSync(marker, tag); } catch (_) {}
             done++; if (onProgress) onProgress(0.92 * done / fr.length);
           }
         };
@@ -433,6 +475,8 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
           if (m && onProgress) onProgress(Math.min(1, 0.92 + 0.08 * (+m[1] * 3600 + +m[2] * 60 + parseFloat(m[3])) / dur));
         }, reg);
         });
+        if (reused) encoderNote += ' (reused ' + reused + ' finished clips from the previous attempt)';
+        try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch (_) {}
       }
       if (cancelled) throw new Error('cancelled');
       if (!opts.range && ((!vertical && ((opts.intro && opts.intro.path) || (opts.outro && opts.outro.path))) || (opts.wm && (opts.wm.path || opts.wm.png)) || (!vertical && opts.ct && opts.ct.length))) {
