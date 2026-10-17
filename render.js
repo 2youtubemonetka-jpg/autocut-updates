@@ -117,10 +117,30 @@ function cutRange(frames, t0, t1) {
       for (const st of f.subs) { const x0 = s0, x1 = s0 + st.d; s0 = x1; const lo2 = Math.max(x0, lo), hi2 = Math.min(x1, hi); if (hi2 > lo2) ns.push({ png: st.png, d: hi2 - lo2 }); }
       g.subs = ns;
     }
-    if (lo > a) g.tr = 0;
+    if (lo > a) { g.tr = 0; if (g.flash != null && g.flash !== false) { g.flash -= (lo - a); if (g.flash < -0.05) g.flash = false; else g.flash = Math.max(0, g.flash); } }
     out.push(g);
   }
   return out;
+}
+
+// speech loudness: two passes (measure, then a linear gain) so the level is steady and nothing is squashed
+const LOUD_I = -16, LOUD_TP = -1.5, LOUD_LRA = 11;
+function loudnormExpr(m) {
+  let e = 'loudnorm=I=' + LOUD_I + ':TP=' + LOUD_TP + ':LRA=' + LOUD_LRA;
+  if (m && isFinite(m.input_i) && isFinite(m.input_tp) && isFinite(m.input_lra) && isFinite(m.input_thresh) && isFinite(m.target_offset))
+    e += ':measured_I=' + m.input_i + ':measured_TP=' + m.input_tp + ':measured_LRA=' + m.input_lra + ':measured_thresh=' + m.input_thresh + ':offset=' + m.target_offset + ':linear=true';
+  return e;
+}
+function measureLoud(bin, audioPath, reg) {
+  return new Promise(resolve => {
+    let text = '';
+    runFf(bin, ['-hide_banner', '-nostats', '-i', audioPath, '-af', 'loudnorm=I=' + LOUD_I + ':TP=' + LOUD_TP + ':LRA=' + LOUD_LRA + ':print_format=json', '-vn', '-f', 'null', '-'], t => { text = (text + t).slice(-6000); }, reg)
+      .then(() => {
+        const m = text.match(/\{[^{}]*"input_i"[^{}]*\}/);
+        if (!m) return resolve(null);
+        try { const j = JSON.parse(m[0]); const o = {}; for (const k of ['input_i', 'input_tp', 'input_lra', 'input_thresh', 'target_offset']) o[k] = parseFloat(j[k]); resolve(o); } catch (_) { resolve(null); }
+      }).catch(() => resolve(null));
+  });
 }
 
 // audio graph: voice (+ background music with ducking) with a fade-out at the end
@@ -128,11 +148,12 @@ function audioArgs(opts, voicePath, total, voiceSs) {
   const inp = []; if (voiceSs) inp.push('-ss', String(voiceSs)); inp.push('-i', voicePath);
   const fo = Math.max(0, +opts.fadeOut || 0), parts = [];
   const music = opts.music && opts.music.path ? opts.music : null;
+  const vf = opts.normVoice ? loudnormExpr(opts.normMeasured) + ',aresample=48000,' : '';
   let last;
   if (music) {
     inp.push('-stream_loop', '-1'); if (voiceSs) inp.push('-ss', String(voiceSs)); inp.push('-i', music.path);
     const vol = Math.max(0, Math.min(2, (music.vol == null ? 0.2 : music.vol)));
-    parts.push('[1:a]apad,asplit=2[v1][v2]');
+    parts.push('[1:a]' + vf + 'apad,asplit=2[v1][v2]');
     parts.push('[2:a]volume=' + vol.toFixed(3) + ',afade=t=in:st=0:d=1.5[m]');
     if (music.duck > 0) {
       const ratio = music.duck >= 2 ? 12 : 4;
@@ -142,7 +163,7 @@ function audioArgs(opts, voicePath, total, voiceSs) {
       parts.push('[v1]anullsink;[v2][m]amix=inputs=2:duration=first:normalize=0:dropout_transition=0[mix]');
     }
     last = 'mix';
-  } else { parts.push('[1:a]apad[mix]'); last = 'mix'; }
+  } else { parts.push('[1:a]' + vf + 'apad[mix]'); last = 'mix'; }
   // sound effects on scenes: each one is delayed to its moment and laid over the mix
   const sfx = (opts.sfx || []).map(x => ({ path: x.path, at: (+x.at || 0) - (voiceSs || 0), vol: x.vol == null ? 1 : +x.vol }))
     .filter(x => x.path && x.at >= -0.05 && x.at < total - 0.05).slice(0, 200);
@@ -190,12 +211,14 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
     const hasSubs = !!opts.burn && fr.some(f => f.subs && f.subs.some(s => s.png));
     const hasTr = fr.some((f, i) => i > 0 && f.tr > 0);
     const hasFx = fr.some(f => f.fx);
+    const film = hasFilm(opts.film, fr) ? opts.film : null;
     const fadeIn = Math.max(0, +opts.fadeIn || 0), fadeOutV = Math.max(0, +opts.fadeOut || 0);
-    try { fs.writeFileSync(outPath.replace(/\.[^.\\/]+$/, '') + '_log.txt', 'AutoCut render log\n' + new Date().toISOString() + '\nframes=' + fr.length + ' subs=' + hasSubs + ' transitions=' + hasTr + ' fx=' + hasFx + '\nopts=' + JSON.stringify(Object.assign({}, opts, { blankPng: opts.blankPng ? 'yes' : '' })) + '\nos=' + process.platform + ' tmp=' + os.tmpdir() + '\n', 'utf8'); } catch (_) {}
+    try { fs.writeFileSync(outPath.replace(/\.[^.\\/]+$/, '') + '_log.txt', 'AutoCut render log\n' + new Date().toISOString() + '\nframes=' + fr.length + ' subs=' + hasSubs + ' transitions=' + hasTr + ' fx=' + hasFx + ' film=' + !!film + '\nopts=' + JSON.stringify(Object.assign({}, opts, { blankPng: opts.blankPng ? 'yes' : '' })) + '\nos=' + process.platform + ' tmp=' + os.tmpdir() + '\n', 'utf8'); } catch (_) {}
+    if (opts.normVoice) { opts.normMeasured = await measureLoud(bin, audioPath, reg); if (cancelled) throw new Error('cancelled'); }
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'autocut_'));
     const aa = audioArgs(opts, audioPath, total, voiceSs);
     try {
-      if (!hasFx && !hasTr && !hasSubs && !vertical) {
+      if (!hasFx && !hasTr && !hasSubs && !vertical && !film) {
         // fast path: one pass, still images through the concat demuxer
         const list = path.join(tmpRoot, 'list.txt');
         fs.writeFileSync(list, buildConcat(fr), 'utf8');
@@ -261,6 +284,11 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
               g.push('[vv2]scale=1080:-2[vfg]');
               g.push('[vbg][vfg]overlay=0:(H-h)/2[vw]'); cur = 'vw';
             }
+            // film layer
+            if (film) {
+              const fc = filmChain(film, film.flash && f.flash != null && f.flash !== false ? f.flash : false, vertical ? 1080 : VW, vertical ? 1920 : VH);
+              if (fc.length) { g.push('[' + cur + ']format=yuv420p,' + fc.join(',') + '[fl]'); cur = 'fl'; }
+            }
             // captions
             if (subLists[i]) {
               args.push('-f', 'concat', '-safe', '0', '-i', subLists[i]);
@@ -301,5 +329,27 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
   })();
   return { promise, cancel: () => { cancelled = true; kids.forEach(c => { try { c.kill(); } catch (_) {} }); } };
 }
+
+// film layer: tone, shake, grain, vignette and a flash on chosen pictures (applied to every clip)
+function filmChain(film, flash, W, H) {
+  const out = [];
+  if (!film) return out;
+  if (film.shake > 0) {
+    const z = film.shake >= 2 ? 1.07 : 1.035, a = film.shake >= 2 ? 0.95 : 0.8;
+    out.push('crop=w=iw/' + z + ':h=ih/' + z + ":x='(iw-ow)/2*(1+" + a + "*(sin(n*0.83)+0.5*sin(n*2.1+1))/1.5)':y='(ih-oh)/2*(1+" + a + "*(sin(n*1.07+2)+0.5*sin(n*2.7))/1.5)',scale=" + W + ':' + H + ':flags=bilinear,setsar=1');
+  }
+  if (film.tone === 'dark') out.push('eq=saturation=0.7:contrast=1.1:brightness=-0.03');
+  else if (film.tone === 'warm') out.push('colorbalance=rs=0.07:gs=0.01:bs=-0.07:rm=0.05:bm=-0.05');
+  else if (film.tone === 'cold') out.push('colorbalance=rs=-0.06:bs=0.08:rm=-0.04:bm=0.06');
+  if (film.grain > 0) out.push('noise=alls=' + [0, 7, 13, 22][Math.min(3, film.grain)] + ':allf=t');
+  if (film.vig > 0) out.push('vignette=angle=' + (film.vig >= 2 ? 'PI/3.2' : 'PI/4.6'));
+  if (flash !== false && flash != null) {
+    const a = Math.max(0, +flash || 0);
+    out.push("drawbox=x=0:y=0:w=iw:h=ih:color=white@0.55:t=fill:enable='between(t," + a.toFixed(3) + ',' + (a + 0.07).toFixed(3) + ")'");
+    out.push("drawbox=x=0:y=0:w=iw:h=ih:color=white@0.22:t=fill:enable='between(t," + (a + 0.07).toFixed(3) + ',' + (a + 0.17).toFixed(3) + ")'");
+  }
+  return out;
+}
+function hasFilm(film, fr) { return !!film && (film.shake > 0 || film.grain > 0 || film.vig > 0 || (film.tone && film.tone !== 'none') || (film.flash && fr.some(f => f.flash != null && f.flash !== false))); }
 
 module.exports = { renderVideo, buildConcat, ffmpegPath, fitFrames, fxFilter, buildSrt };
