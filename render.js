@@ -159,7 +159,7 @@ function loudnormExpr(m) {
 function measureLoud(bin, audioPath, reg) {
   return new Promise(resolve => {
     let text = '';
-    runFf(bin, ['-hide_banner', '-nostats', '-i', audioPath, '-af', 'loudnorm=I=' + LOUD_I + ':TP=' + LOUD_TP + ':LRA=' + LOUD_LRA + ':print_format=json', '-vn', '-f', 'null', '-'], t => { text = (text + t).slice(-6000); }, reg)
+    runFf(bin, ['-hide_banner', '-nostats', '-i', audioPath, '-af', 'aformat=channel_layouts=stereo,loudnorm=I=' + LOUD_I + ':TP=' + LOUD_TP + ':LRA=' + LOUD_LRA + ':print_format=json', '-vn', '-f', 'null', '-'], t => { text = (text + t).slice(-6000); }, reg)
       .then(() => {
         const m = text.match(/\{[^{}]*"input_i"[^{}]*\}/);
         if (!m) return resolve(null);
@@ -173,7 +173,7 @@ function audioArgs(opts, voicePath, total, voiceSs) {
   const inp = []; if (voiceSs) inp.push('-ss', String(voiceSs)); inp.push('-i', voicePath);
   const fo = Math.max(0, +opts.fadeOut || 0), parts = [];
   const music = opts.music && opts.music.path ? opts.music : null;
-  const vf = opts.normVoice ? loudnormExpr(opts.normMeasured) + ',aresample=48000,' : '';
+  const vf = opts.normVoice ? 'aformat=channel_layouts=stereo,' + loudnormExpr(opts.normMeasured) + ',aresample=48000,aformat=channel_layouts=stereo,' : '';
   let last;
   if (music) {
     inp.push('-stream_loop', '-1'); if (voiceSs) inp.push('-ss', String(voiceSs)); inp.push('-i', music.path);
@@ -283,7 +283,16 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
     try { fs.writeFileSync(outPath.replace(/\.[^.\\/]+$/, '') + '_log.txt', 'AutoCut render log\n' + new Date().toISOString() + '\nframes=' + fr.length + ' subs=' + hasSubs + ' transitions=' + hasTr + ' fx=' + hasFx + ' film=' + !!film + '\nopts=' + JSON.stringify(Object.assign({}, opts, { blankPng: opts.blankPng ? 'yes' : '' })) + '\nos=' + process.platform + ' tmp=' + os.tmpdir() + '\n', 'utf8'); } catch (_) {}
     if (opts.normVoice) { opts.normMeasured = await measureLoud(bin, audioPath, reg); if (cancelled) throw new Error('cancelled'); }
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'autocut_'));
-    const aa = audioArgs(opts, audioPath, total, voiceSs);
+    // if the loudness filter chain fails on some ffmpeg build, the same step is repeated without it
+    const audioRetry = async build => {
+      try { if (process.env.AUTOCUT_FAIL_NORM && opts.normVoice) throw new Error('Cannot select channel layout (test hook)'); await build(); }
+      catch (e) {
+        if (opts.normVoice && !cancelled && /channel layout|Invalid argument|Error reinitializing|Failed to inject/i.test(String(e.message || e))) {
+          opts.normVoice = false; encoderNote += ' (loudness normalisation failed on this ffmpeg, rendered without it: ' + String(e.message || e).split('\n')[0].slice(0, 100) + ')';
+          await build();
+        } else throw e;
+      }
+    };
     try {
       if (!hasFx && !hasTr && !hasSubs && !vertical && !film) {
         // fast path: one pass, still images through the concat demuxer
@@ -292,6 +301,8 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
         let vf = FIT + ',fps=' + FPS + ',format=yuv420p,tpad=stop_mode=clone:stop_duration=5';
         if (fadeIn > 0) vf += ',fade=t=in:st=0:d=' + fadeIn.toFixed(2);
         if (fadeOutV > 0) vf += ',fade=t=out:st=' + Math.max(0, total - fadeOutV).toFixed(3) + ':d=' + fadeOutV.toFixed(2);
+        await audioRetry(async () => {
+        const aa = audioArgs(opts, audioPath, total, voiceSs);
         const args = ['-y', '-hide_banner', '-f', 'concat', '-safe', '0', '-i', list, ...aa.inp, '-filter_complex', aa.graph, '-map', '0:v', '-vf', vf, '-map', '[a]',
           '-c:v', 'libx264', '-preset', Q[0], '-crf', Q[1], '-tune', 'stillimage', '-c:a', 'aac', '-b:a', '192k', '-t', total.toFixed(3), '-movflags', '+faststart', outPath];
         await runFf(bin, args, t => {
@@ -299,6 +310,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
           const m = [...t.matchAll(/time=(\d+):(\d+):(\d+\.?\d*)/g)].pop();
           if (m && onProgress) onProgress(Math.min(1, (+m[1] * 3600 + +m[2] * 60 + parseFloat(m[3])) / total));
         }, reg);
+        });
       } else {
         // every picture becomes a clip with an exact frame count; the clips are joined without re-encoding
         let acc = 0; const counts = [];
@@ -386,12 +398,14 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
         const list = path.join(tmpRoot, 'clips.txt');
         fs.writeFileSync(list, clips.map(c => "file '" + esc(c) + "'").join('\n') + '\n', 'utf8');
         const dur = nFrames / FPS;
+        await audioRetry(async () => {
         const aa2 = audioArgs(opts, audioPath, dur, voiceSs);
         await runFf(bin, ['-y', '-hide_banner', '-f', 'concat', '-safe', '0', '-i', list, ...aa2.inp, '-filter_complex', aa2.graph, '-map', '0:v', '-map', '[a]',
           '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', dur.toFixed(3), '-movflags', '+faststart', outPath], t => {
           const m = [...t.matchAll(/time=(\d+):(\d+):(\d+\.?\d*)/g)].pop();
           if (m && onProgress) onProgress(Math.min(1, 0.92 + 0.08 * (+m[1] * 3600 + +m[2] * 60 + parseFloat(m[3])) / dur));
         }, reg);
+        });
       }
       if (cancelled) throw new Error('cancelled');
       if (!opts.range && !vertical && ((opts.intro && opts.intro.path) || (opts.outro && opts.outro.path))) {
