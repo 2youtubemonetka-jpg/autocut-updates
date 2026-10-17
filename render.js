@@ -143,6 +143,20 @@ function audioArgs(opts, voicePath, total, voiceSs) {
     }
     last = 'mix';
   } else { parts.push('[1:a]apad[mix]'); last = 'mix'; }
+  // sound effects on scenes: each one is delayed to its moment and laid over the mix
+  const sfx = (opts.sfx || []).map(x => ({ path: x.path, at: (+x.at || 0) - (voiceSs || 0), vol: x.vol == null ? 1 : +x.vol }))
+    .filter(x => x.path && x.at >= -0.05 && x.at < total - 0.05).slice(0, 200);
+  if (sfx.length) {
+    const base = music ? 3 : 2, labels = [];
+    sfx.forEach((x, k) => {
+      inp.push('-i', x.path);
+      const ms = Math.max(0, Math.round(x.at * 1000));
+      parts.push('[' + (base + k) + ':a]aformat=channel_layouts=mono,volume=' + Math.max(0, Math.min(3, x.vol)).toFixed(3) + ',adelay=' + ms + '|' + ms + '[s' + k + ']');
+      labels.push('[s' + k + ']');
+    });
+    parts.push('[' + last + ']' + labels.join('') + 'amix=inputs=' + (sfx.length + 1) + ':duration=first:normalize=0:dropout_transition=0,alimiter=limit=0.95:level=0:latency=1:attack=3:release=60[mixs]');
+    last = 'mixs';
+  }
   const mf = Math.max(0, +(music && music.fade) || 0), tail = Math.max(fo, mf);
   if (tail > 0) { parts.push('[' + last + ']afade=t=out:st=' + Math.max(0, total - tail).toFixed(3) + ':d=' + tail.toFixed(3) + '[a]'); } else parts.push('[' + last + ']anull[a]');
   return { inp, graph: parts.join(';') };

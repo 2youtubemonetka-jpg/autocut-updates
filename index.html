@@ -205,6 +205,53 @@
   .card p{color:var(--dim);margin:0 0 16px}
   .card .btn{display:block;width:100%;margin-bottom:8px;text-align:left}
   .hint{font-size:12.5px;color:var(--dim);margin-top:10px}
+  /* form controls inside dialogs */
+  .card .inp,.card input.inp,.card textarea.inp,.card select.inp{display:block;width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);padding:8px 10px;font:inherit;font-size:14px;margin:0 0 8px;outline:none}
+  .card textarea.inp{resize:vertical;line-height:1.4}
+  .card .inp:focus{border-color:var(--accent2)}
+  .card label.fl{display:block;font-size:12.5px;color:var(--dim);margin:2px 0 4px}
+  .card .btns{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 8px}
+  .card .btns .btn{width:auto;margin:0;text-align:center}
+  .card .btn.w{width:auto;display:inline-block;text-align:center}
+  .card.wide{width:min(980px,96vw);max-height:94vh;overflow-y:auto}
+  .card.mid{width:min(720px,94vw);max-height:94vh;overflow-y:auto}
+  .modal{padding:10px}
+  .tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .tools .btn{padding:8px 8px;font-size:13px;text-align:center}
+  .tools .btn.full{grid-column:1/-1}
+  /* re-generation */
+  .rgpair{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px}
+  .rgimg{width:100%;aspect-ratio:16/9;object-fit:contain;background:var(--stage);border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;color:var(--dim);font-size:13px}
+  .rgvars{display:flex;gap:8px;overflow-x:auto;padding:4px 0 8px}
+  .rgvars button{flex:none;width:132px;padding:0;border:2px solid var(--line);border-radius:9px;background:var(--stage);overflow:hidden;position:relative}
+  .rgvars button img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
+  .rgvars button.on{border-color:var(--accent)}
+  .rgvars button span{position:absolute;left:4px;bottom:4px;background:var(--overlay);border-radius:6px;padding:0 6px;font-size:11px}
+  /* thumbnail */
+  .thgrid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px;align-items:start}
+  .thgrid canvas{width:100%;height:auto;border-radius:10px;border:1px solid var(--line);background:#000;cursor:grab;display:block}
+  .thgrid canvas.drag{cursor:grabbing}
+  .throw{display:grid;grid-template-columns:96px 1fr;gap:6px;align-items:center;margin-bottom:6px;font-size:13px;color:var(--dim)}
+  .throw select,.throw input[type=range]{width:100%;margin:0}
+  @media (max-width:820px){ .thgrid{grid-template-columns:1fr} }
+  /* scene sounds */
+  .sxlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:10px}
+  .sxi{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:6px 8px;font-size:13px;cursor:pointer;user-select:none}
+  .sxi b{flex:1;font-weight:500}
+  .sxi.on{border-color:var(--accent);background:var(--tint)}
+  .sxi i{font-style:normal;font-size:11px;width:24px;height:22px;border-radius:7px;border:1px solid var(--line);display:grid;place-items:center;color:var(--dim);flex:none}
+  .sxi i:hover{border-color:var(--accent2);color:var(--text)}
+  /* chapters */
+  .chrow{display:grid;grid-template-columns:62px minmax(0,1fr) auto auto;gap:6px;align-items:center;margin-bottom:6px}
+  .chrow .tc{font:600 13px ui-monospace,Consolas,monospace;color:var(--accent2)}
+  .chrow input{margin:0 !important}
+  .chrow .btn{width:auto;margin:0;padding:5px 9px;font-size:12px}
+  /* checks */
+  .pfi{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);margin-bottom:6px;font-size:13.5px;line-height:1.4}
+  .pfi b{flex:none;font-size:11px;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-top:1px}
+  .pfi.err b{background:rgba(230,57,70,.18);color:var(--accent)}
+  .pfi.warn b{background:rgba(245,165,36,.16);color:var(--warn)}
+  .pfi.ok b{background:rgba(46,194,126,.16);color:var(--ok)}
 </style>
 </head>
 <body>
@@ -239,8 +286,6 @@
         <label class="drop" id="dTxt"><b>3. Текст по строкам</b><span id="sTxt"></span>
           <input type="file" id="fTxt" accept=".txt,text/plain"></label>
         <button class="btn" id="ttsOpen" style="display:none;width:100%">Озвучить текст (ElevenLabs)</button>
-        <button class="btn" id="shOpen" style="display:none;width:100%">Shorts 9:16</button>
-        <button class="btn" id="qOpen" style="display:none;width:100%">Очередь рендера</button>
         <button class="btn" id="genOpen" style="display:none;width:100%" title="Программа сама сгенерирует картинки в Gemini по вашим промтам">Сгенерировать картинки (Gemini)</button>
       </div>
     </div>
@@ -251,6 +296,18 @@
       <div class="stat" id="stA"><b>0:00</b><small>звук</small></div>
     </div>
     <div class="msg" id="msg"></div>
+
+    <div class="sec">
+      <h4>Пресет канала</h4>
+      <div class="fxbox">
+        <div class="row"><select id="psSel" style="flex:1;min-width:0" title="Сохранённые наборы настроек"></select>
+          <button class="mini" id="psSave" title="Сохранить текущие настройки как пресет">+</button>
+          <button class="mini" id="psDel" title="Удалить выбранный пресет">&times;</button></div>
+        <button class="btn" id="psApply" style="width:100%">Применить к этому проекту</button>
+        <label class="chk"><input type="checkbox" id="psDef"> Ставить в новые проекты этого канала</label>
+        <div class="hint" id="psInfo" style="margin:0">Пресет хранит движение, переходы, качество, субтитры и музыку.</div>
+      </div>
+    </div>
 
     <div class="sec">
       <h4>Эффекты</h4>
@@ -325,6 +382,18 @@
     </div>
 
     <div class="sec">
+      <h4>Готовое видео</h4>
+      <div class="tools">
+        <button class="btn full" id="pfOpen" title="Найти проблемы до сборки: пропавшие файлы, длинные строки, звук короче разметки">Проверить проект</button>
+        <button class="btn" id="thOpen" title="Обложка 1280x720 из кадра видео с крупным текстом">Обложка</button>
+        <button class="btn" id="chOpen" title="Список глав с временем для описания на YouTube">Главы</button>
+        <button class="btn" id="shOpen" style="display:none">Shorts 9:16</button>
+        <button class="btn" id="qOpen" style="display:none">Очередь</button>
+        <button class="btn full" id="bkOpen" style="display:none" title="Сохранить проект со всеми файлами в папку или на флешку">Резервная копия</button>
+      </div>
+    </div>
+
+    <div class="sec">
       <h4>Настройки</h4>
       <div class="row" style="margin-bottom:8px">
         <span style="color:var(--dim);font-size:13.5px;flex:1">Скорость звука</span>
@@ -379,6 +448,9 @@
           <button class="edb" id="edSplit" title="Разрезать кадр в месте курсора на два">Разрезать здесь</button>
           <button class="edb danger" id="edDel" title="Убрать кадр, его время отдаётся предыдущему">Удалить кадр</button>
           <button class="edb" id="edImg">Заменить картинку</button><input type="file" id="edImgFile" accept="image/*" style="display:none">
+          <button class="edb go" id="edRegen" style="display:none" title="Заново сделать картинку этого кадра в Gemini">Перегенерировать</button>
+          <button class="edb" id="edSfx" title="Поставить звук (удар, щелчок, вжух…) на этот кадр">Звук</button>
+          <button class="edb" id="edChap" title="С этого кадра начинается глава (для описания на YouTube)">Глава</button>
           <input type="text" id="edTxt" placeholder="Текст кадра" spellcheck="false"></div>
       </div>
     </div>
@@ -444,34 +516,156 @@
   </div>
 </div>
 
-<div class="modal" id="shModal"><div class="card">
+<div class="modal" id="rgModal"><div class="card mid">
+  <h2 id="rgTitle">Перегенерировать сцену</h2>
+  <div class="rgpair">
+    <div><label class="fl">Сейчас в видео</label><img id="rgCur" class="rgimg" alt=""></div>
+    <div><label class="fl">Новый вариант</label><div id="rgNewBox"><div class="rgimg" id="rgNewPh">Нажмите «Сгенерировать»</div></div></div>
+  </div>
+  <label class="fl" for="rgPrompt">Промт сцены. Можно поправить перед генерацией, правка сохранится в проекте.</label>
+  <textarea id="rgPrompt" class="inp" rows="5" spellcheck="false"></textarea>
+  <div class="btns">
+    <button class="btn primary" id="rgGo">Сгенерировать</button>
+    <button class="btn" id="rgStop" style="display:none">Стоп</button>
+    <button class="btn" id="rgLaunch">Открыть Gemini</button>
+  </div>
+  <div class="hint" id="rgMsg" style="margin:0 0 8px;min-height:18px"></div>
+  <label class="fl">Все варианты этой сцены. Нажмите на картинку, чтобы поставить её в видео.</label>
+  <div class="rgvars" id="rgVars"></div>
+  <button class="btn" id="rgClose">Закрыть</button>
+</div></div>
+
+<div class="modal" id="psModal"><div class="card">
+  <h2>Сохранить пресет</h2>
+  <p>В пресет попадут текущие настройки движения, переходов, качества, субтитров и музыки.</p>
+  <label class="fl" for="psName">Название</label>
+  <input id="psName" class="inp" maxlength="40" spellcheck="false" placeholder="Например: Rules Written In Blood">
+  <label class="chk" style="margin-bottom:12px"><input type="checkbox" id="psNameDef"> <span id="psNameDefT">Ставить в новые проекты этого канала</span></label>
+  <div class="btns"><button class="btn primary" id="psOk">Сохранить</button><button class="btn" id="psCancel">Отмена</button></div>
+</div></div>
+
+<div class="modal" id="thModal"><div class="card wide">
+  <h2>Обложка</h2>
+  <div class="thgrid">
+    <div>
+      <canvas id="thCv" width="1280" height="720"></canvas>
+      <div class="hint" style="margin:6px 0 0">Перетаскивайте картинку мышью, чтобы выбрать, какая часть попадёт в кадр. Колесо мыши приближает.</div>
+    </div>
+    <div>
+      <label class="fl">Кадр</label>
+      <div class="btns" style="margin-top:0;align-items:center">
+        <button class="btn" id="thPrev" title="Предыдущий кадр">&larr;</button>
+        <input id="thScene" class="inp" type="number" min="1" style="width:76px;margin:0">
+        <button class="btn" id="thNext" title="Следующий кадр">&rarr;</button>
+        <button class="btn" id="thCurBtn" title="Кадр, где сейчас стоит воспроизведение">Текущий</button>
+      </div>
+      <div class="btns" style="margin-top:0"><button class="btn" id="thFileBtn">Своя картинка…</button><input type="file" id="thFile" accept="image/*" style="display:none"></div>
+      <label class="fl" for="thText">Текст. Каждая строка отдельно, слово в *звёздочках* выделяется.</label>
+      <textarea id="thText" class="inp" rows="3" spellcheck="false" placeholder="THE HAIR DRYER&#10;*KILLED* 17 A YEAR"></textarea>
+      <div class="throw"><span>Цвет текста</span><select id="thFg" class="inp"></select></div>
+      <div class="throw"><span>Выделение</span><select id="thHl" class="inp"></select></div>
+      <div class="throw"><span>Плашка</span><select id="thBox" class="inp"><option value="">Нет</option><option value="#e63946">Красная</option><option value="#ffd60a">Жёлтая</option><option value="#0b0b0b">Чёрная</option><option value="#ffffff">Белая</option></select></div>
+      <div class="throw"><span>Где текст</span><select id="thPos" class="inp"><option value="left">Слева</option><option value="right">Справа</option><option value="top">Сверху</option><option value="bottom">Снизу</option><option value="center">По центру</option></select></div>
+      <div class="throw"><span>Размер</span><input type="range" id="thSize" min="55" max="100" value="100"></div>
+      <div class="throw"><span>Наклон</span><select id="thTilt" class="inp"><option value="0">Нет</option><option value="-4">Влево</option><option value="4">Вправо</option></select></div>
+      <div class="throw"><span>Затемнение</span><select id="thDim" class="inp"><option value="0">Нет</option><option value="0.45">Лёгкое</option><option value="0.75">Сильное</option></select></div>
+      <div class="throw"><span>Приближение</span><input type="range" id="thZoom" min="100" max="250" value="100"></div>
+      <div class="btns"><button class="btn primary" id="thSave">Сохранить обложку</button><button class="btn" id="thSaveAs" style="display:none">В другую папку…</button></div>
+      <div class="hint" id="thMsg" style="margin:0 0 8px;min-height:18px">Сохраняется в JPG 1280x720 до 2 МБ, как требует YouTube.</div>
+      <button class="btn" id="thClose">Закрыть</button>
+    </div>
+  </div>
+</div></div>
+
+<div class="modal" id="sxModal"><div class="card mid">
+  <h2 id="sxTitle">Звук на кадре</h2>
+  <p id="sxSub" style="margin:0 0 10px"></p>
+  <label class="fl">Встроенные звуки. Кнопка ▶ даёт послушать, нажатие на название ставит звук на кадр.</label>
+  <div class="sxlist" id="sxList"></div>
+  <div class="btns" style="margin-top:0"><button class="btn" id="sxFileBtn">Свой файл…</button><input type="file" id="sxFile" accept="audio/*,.mp3,.wav,.ogg,.m4a" style="display:none"></div>
+  <div class="hint" id="sxCur" style="margin:0 0 10px">Звука на этом кадре нет</div>
+  <div class="throw" style="grid-template-columns:120px 1fr"><span>Громкость</span><input type="range" id="sxVol" min="10" max="150" value="100"></div>
+  <div class="throw" style="grid-template-columns:120px 1fr"><span>Когда звучит</span><select id="sxOff" class="inp" style="margin:0">
+    <option value="-0.3">Чуть раньше кадра (на 0.3 с)</option><option value="0" selected>С началом кадра</option><option value="0.3">Через 0.3 с</option><option value="0.6">Через 0.6 с</option><option value="1">Через 1 с</option><option value="2">Через 2 с</option></select></div>
+  <div class="btns">
+    <button class="btn primary" id="sxTry">Послушать в видео</button>
+    <button class="btn" id="sxDel">Убрать звук</button>
+    <button class="btn" id="sxClose">Готово</button>
+  </div>
+  <div class="hint" style="margin:0">Звуки слышно в «Просмотре результата» и в готовом видео. На шкале кадры со звуком отмечены нотой.</div>
+</div></div>
+
+<div class="modal" id="cpModal"><div class="card">
+  <h2>Глава с этого кадра</h2>
+  <p id="cpSub"></p>
+  <label class="fl" for="cpName">Название главы</label>
+  <input id="cpName" class="inp" maxlength="80" spellcheck="false">
+  <div class="btns"><button class="btn primary" id="cpOk">Сохранить</button><button class="btn" id="cpDel">Убрать главу</button><button class="btn" id="cpCancel">Отмена</button></div>
+</div></div>
+
+<div class="modal" id="chModal"><div class="card mid">
+  <h2>Главы и описание</h2>
+  <p style="margin:0 0 10px">Главы ставятся на кадры: кнопка «Глава» в редакторе под шкалой или «Предложить» здесь. Время берётся из разметки.</p>
+  <div class="btns" style="margin-top:0;align-items:center">
+    <button class="btn" id="chAuto">Предложить главы</button>
+    <select id="chCount" class="inp" style="width:auto;margin:0"><option value="0">Сколько: само</option><option value="4">4 главы</option><option value="5">5 глав</option><option value="6">6 глав</option><option value="8">8 глав</option><option value="10">10 глав</option></select>
+    <button class="btn" id="chClear">Убрать все</button>
+  </div>
+  <div id="chList" style="max-height:34vh;overflow:auto;margin-bottom:6px"></div>
+  <div id="chWarn"></div>
+  <label class="fl" for="chDesc">Описание видео (необязательно, хранится в проекте)</label>
+  <textarea id="chDesc" class="inp" rows="4"></textarea>
+  <label class="fl" for="chOut">Готовый текст для YouTube</label>
+  <textarea id="chOut" class="inp" rows="7" readonly></textarea>
+  <div class="btns"><button class="btn primary" id="chCopy">Скопировать</button><button class="btn" id="chClose">Закрыть</button></div>
+</div></div>
+
+<div class="modal" id="bkModal"><div class="card">
+  <h2>Резервная копия</h2>
+  <p style="margin:0 0 12px">Копия забирает картинки, озвучку, музыку, звуки, текст, промты и всю разметку в одну папку. Выберите флешку, облачную папку или другой диск: после переустановки Windows проект можно будет вернуть кнопкой «Восстановить».</p>
+  <button class="btn primary" id="bkOne">Сохранить копию этого проекта…</button>
+  <button class="btn" id="bkAll">Сохранить копию всех проектов…</button>
+  <button class="btn" id="bkRestore">Восстановить из копии…</button>
+  <div id="bkWrap" style="display:none;margin:6px 0 10px"><div class="prog"><div id="bkBar"></div></div></div>
+  <div class="hint" id="bkMsg" style="margin:0 0 10px;min-height:18px"></div>
+  <button class="btn" id="bkClose">Закрыть</button>
+</div></div>
+
+<div class="modal" id="pfModal" style="z-index:30"><div class="card mid">
+  <h2>Проверка перед сборкой</h2>
+  <p id="pfSub" style="margin:0 0 10px"></p>
+  <div id="pfList" style="max-height:52vh;overflow:auto;margin-bottom:8px"></div>
+  <div class="btns"><button class="btn primary" id="pfGo">Собрать всё равно</button><button class="btn" id="pfFix">Вернуться и исправить</button></div>
+</div></div>
+
+<div class="modal" id="shModal"><div class="card mid">
   <h2>Shorts 9:16</h2>
   <p class="hint">Вертикальное видео 1080x1920 из этого же проекта: картинка по центру на размытом фоне, субтитры по центру.</p>
-  <div class="row" style="gap:8px"><label style="flex:1">Начало (м:сс)<input id="shStart" value="0:00" style="width:100%"></label>
-  <label style="flex:1">Длина<select id="shLen" style="width:100%"><option value="15">15 с</option><option value="30">30 с</option><option value="45" selected>45 с</option><option value="58">58 с</option></select></label></div>
+  <div class="row" style="gap:8px"><label style="flex:1">Начало (м:сс)<input id="shStart" class="inp" value="0:00"></label>
+  <label style="flex:1">Длина<select id="shLen" class="inp"><option value="15">15 с</option><option value="30">30 с</option><option value="45" selected>45 с</option><option value="58">58 с</option></select></label></div>
   <button class="btn primary" id="shGo1">Сделать один Short с этого места</button>
   <button class="btn" id="shGoAll">Нарезать всё видео на Shorts</button>
   <p class="hint" id="shMsg"></p>
   <button class="btn" id="shClose">Закрыть</button>
 </div></div>
-<div class="modal" id="qModal"><div class="card">
+<div class="modal" id="qModal"><div class="card mid">
   <h2>Очередь рендера</h2>
   <p class="hint">Отметьте проекты: они соберутся по очереди в одну папку.</p>
   <div id="qList" style="max-height:260px;overflow:auto"></div>
   <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="qShorts"> Ещё нарезать Shorts</label>
-  <label style="display:block;margin-top:6px">Длина Short<select id="qShLen"><option value="15">15 с</option><option value="30">30 с</option><option value="45" selected>45 с</option><option value="58">58 с</option></select></label>
+  <label class="fl" style="margin-top:6px">Длина Short</label><select id="qShLen" class="inp"><option value="15">15 с</option><option value="30">30 с</option><option value="45" selected>45 с</option><option value="58">58 с</option></select>
   <button class="btn primary" id="qGo">Запустить очередь</button>
   <p class="hint" id="qMsg"></p>
   <button class="btn" id="qClose">Закрыть</button>
 </div></div>
-<div class="modal" id="ttsModal"><div class="card">
+<div class="modal" id="ttsModal"><div class="card mid">
   <h2>Озвучка (ElevenLabs)</h2>
   <p class="hint">Нужен ваш ключ API ElevenLabs. Он хранится только на этом компьютере.</p>
-  <input id="ttKey" type="password" placeholder="Ключ API" style="width:100%">
+  <input id="ttKey" class="inp" type="password" placeholder="Ключ API">
   <button class="btn" id="ttLoad">Загрузить голоса</button>
-  <select id="ttVoice" style="width:100%"></select>
-  <select id="ttModel" style="width:100%"><option value="eleven_multilingual_v2">eleven_multilingual_v2</option><option value="eleven_turbo_v2_5">eleven_turbo_v2_5</option><option value="eleven_flash_v2_5">eleven_flash_v2_5</option></select>
-  <textarea id="ttText" rows="8" style="width:100%"></textarea>
+  <select id="ttVoice" class="inp"></select>
+  <select id="ttModel" class="inp"><option value="eleven_multilingual_v2">eleven_multilingual_v2</option><option value="eleven_turbo_v2_5">eleven_turbo_v2_5</option><option value="eleven_flash_v2_5">eleven_flash_v2_5</option></select>
+  <textarea id="ttText" class="inp" rows="8"></textarea>
   <button class="btn primary" id="ttGo">Озвучить и добавить в проект</button>
   <p class="hint" id="ttMsg"></p>
   <button class="btn" id="ttClose">Закрыть</button>
@@ -532,7 +726,7 @@
   const QD = () => ({res:'1080', q:'normal'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
   const GND = () => ({text:'', dir:'', key:'', manual:{}});
-  const newState = () => ({fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), gen:GND(), imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const newState = () => ({fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), gen:GND(), meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -677,6 +871,7 @@
       });
       opts.blankPng = blankStrip(strip || 200, vert ? 1080 : 1920);
     }
+    const sx = sfxList(); if(sx.length) opts.sfx = sx.map(x => ({path:x.path, at:x.at, vol:x.vol}));
     if(range) opts.range = range;
     frames[0].opts = opts;
     return frames;
@@ -754,7 +949,7 @@
     try{ await G.cdp.send('Emulation.setFocusEmulationEnabled', {enabled:true}, G.sid); }catch(e){}
   }
   const gEval = async expr => { const r = await G.cdp.send('Runtime.evaluate', {expression: expr, returnByValue: true, awaitPromise: true}, G.sid); return r.result ? r.result.value : undefined; };
-  async function genScene(n, prompt, tok){
+  async function genScene(n, prompt, tok, dstName){
     const dead = () => tok !== G.tok;
     const cdp = G.cdp, sid = G.sid;
     await cdp.send('Page.navigate', {url: GEN.url}, sid);
@@ -800,7 +995,7 @@
     }
     const guid = await got;
     await gsleep(400);
-    const src = G.tmp + (/\\/.test(G.tmp) ? '\\' : '/') + guid, dst = G.dir + G.sep + imgName(n);
+    const src = G.tmp + (/\\/.test(G.tmp) ? '\\' : '/') + guid, dst = G.dir + G.sep + (dstName || imgName(n));
     if(await NATIVE.gen.size(src) <= 0) throw new Error('Файл не найден после скачивания');
     const r = await NATIVE.gen.rename(src, dst); if(!r.ok) throw new Error(r.error);
   }
@@ -811,7 +1006,7 @@
     G.run = true; const tok = ++G.tok; const dead = () => tok !== G.tok; $('gStart').style.display = 'none'; $('gStop').style.display = '';
     try{
       await genDirFor(); G.tmp = await NATIVE.gen.tmp();
-      const needChrome = async () => { if(G.cdp) return; await genConnect(); await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath: G.tmp, eventsEnabled:true}); };
+      const needChrome = async () => { if(G.cdp && G.cdp.ws.readyState === 1) return; await genConnect(); await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath: G.tmp, eventsEnabled:true}); };
       const delay = parseInt($('gDelay').value,10) || 5; let fails = 0;
       for(let pass = 1; pass <= GEN.passes && !dead(); pass++){
         const left = []; const dn = await doneSet(); for(let n = 1; n <= prompts.length; n++) if(!dn.has(n)) left.push(n);
@@ -997,7 +1192,7 @@
   function serialize(st){
     return {imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}};
+            pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}, meta:st.meta||[], thumb:st.thumb||null, desc:st.desc||'', preset:st.preset||''};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -1009,7 +1204,7 @@
     save();
   }
   let saveTimer = null;
-  function touch(){ clearTimeout(saveTimer); saveTimer = setTimeout(() => { try{ if(activeId) saveProject(activeId); }catch(e){} }, 400); }
+  function touch(){ clearTimeout(saveTimer); saveTimer = setTimeout(() => { try{ if(activeId) saveProject(activeId); if(typeof psInfoUpd==='function') psInfoUpd(); }catch(e){} }, 400); }
   setInterval(() => { if(activeId && S.mode==='rec') saveProject(activeId); }, 3000);
   window.addEventListener('beforeunload', () => { try{ if(activeId) saveProject(activeId); }catch(e){} });
   document.addEventListener('visibilitychange', () => { try{ if(document.hidden && activeId) saveProject(activeId); }catch(e){} });
@@ -1018,7 +1213,8 @@
   function hydrate(id){
     const st = newState(); states[id] = st;
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
-    if(!d) return st;
+    if(!d){ const f = findTab(id), pr = f && presetById(f.c.preset); if(pr) applyPresetTo(st, pr); return st; }
+    st.meta = Array.isArray(d.meta) ? d.meta : []; st.thumb = d.thumb || null; st.desc = d.desc || ''; st.preset = d.preset || '';
     st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
@@ -1080,7 +1276,7 @@
     $('modal').classList.remove('on');
     $('bPause').textContent = S.mode==='rec' ? pauseTxt(1) : pauseTxt(0);
     lastShown = -1; computeWeights();
-    renderFiles(); renderFx(); renderPost(); refresh(); setMode(S.mode, S.label);
+    renderFiles(); renderFx(); renderPost(); refresh(); setMode(S.mode, S.label); if(typeof renderPresets==='function') renderPresets(true);
     showFrame(S.mode==='rec' ? S.idx : 0, S.mode==='idle');
   }
   function leave(){
@@ -1443,7 +1639,7 @@
       const i = frameAt(au.currentTime);
       if(i!==lastShown){ lastShown=i; showFrame(i); }
     }
-    edTick();
+    edTick(); if(typeof sfxTick==='function') sfxTick();
     if(S.mode==='rec' || S.mode==='review'){
       const fi = S.mode==='rec' ? S.idx : lastShown;
       if(fi>=0) setHL(currentWord(fi));
@@ -1501,6 +1697,7 @@
     $('hintWeb').textContent = 'Нажмите «Собрать видео», выберите, куда сохранить. ffmpeg уже встроен в программу.';
     NATIVE.onProgress(v => { if(progSink) return; $('rbar').style.width = (v*100)+'%'; $('rtxt').textContent = 'Собираю видео… '+Math.round(v*100)+'%'; });
     const doRender = async range => {
+      if(!(await preflightGate(range ? 'trial' : 'full'))) return;
       let frames;
       try{ frames = buildFrames(range); }catch(err){ $('rwrap').style.display = 'block'; $('rtxt').textContent = 'Ошибка подготовки: '+err.message; return; }
       $('rwrap').style.display = 'block';
@@ -1586,6 +1783,7 @@
   }
   const parseT = v => { const m = String(v).trim().match(/^(\d+):(\d{1,2})$/); return m ? +m[1]*60 + +m[2] : (parseFloat(v) || 0); };
   async function shortsRun(ranges){
+    if(!(await preflightGate('shorts'))) return;
     const dir = await NATIVE.pickDir('Куда сохранить Shorts'); if(!dir) return;
     const sep = /\\/.test(dir) ? '\\' : '/', base = safeFile((findTab(activeId)||{t:{}}).t.name);
     $('shGo1').disabled = $('shGoAll').disabled = true; let ok = 0;
@@ -1602,7 +1800,10 @@
   /* ---- render queue: several projects in a row ---- */
   function queueCandidates(){
     const out = [];
-    DB.channels.forEach(c => openTabs(c).forEach(t => { const sum = t.sum || {}; out.push({id:t.id, name:t.name || 'Без названия', channel:c.name, ready: !!(sum.rec > 1 && sum.audio && sum.n), sum}); }));
+    // open tabs and projects waiting in the library (closed or postponed) that have files
+    DB.channels.forEach(c => c.tabs.forEach(t => { const sum = t.sum || {}, open = t.open !== false;
+      if(!open && !(sum.n || sum.audio)) return;
+      out.push({id:t.id, name:(t.name || 'Без названия')+(open ? '' : ' (в библиотеке)'), channel:c.name, ready: !!(sum.rec > 1 && sum.audio && sum.n), sum}); }));
     return out;
   }
   function openQueue(){
@@ -1624,12 +1825,14 @@
     const ids = [...$('qList').querySelectorAll('input:checked')].map(x => x.value); if(!ids.length){ toast('Отметьте хотя бы один проект'); return; }
     const dir = await NATIVE.pickDir('Куда сохранить готовые видео'); if(!dir) return;
     const sep = /\\/.test(dir) ? '\\' : '/', origin = activeId, withShorts = $('qShorts').checked, shLen = parseInt($('qShLen').value, 10) || 45;
+    const was = {}; ids.forEach(id => { const f = findTab(id); if(f) was[id] = {open:f.t.open !== false, parked:!!f.t.parked}; });
     qBusy = true; $('qGo').disabled = true; let done = 0;
     for(const id of ids){
       const st = $('qs_'+id); const set = t => { if(st) st.textContent = t; $('qMsg').textContent = t; };
       try{
         switchTab(id); await sleep(500);
         if(!S.audioPath || S.starts.length < 2 || S.imgs.some(i => !i.path)){ set('пропущен: нет файлов'); continue; }
+        { const pf = await preflight('full'); if(pf.errs.length){ set('пропущен: '+pf.errs[0].replace(/\.$/,'')); continue; } }
         const nm = safeFile((findTab(id)||{t:{}}).t.name);
         const res = await renderJob('сборка', buildFrames(null), dir + sep + nm + '.mp4', set);
         if(!res.ok){ set('ошибка: '+(res.error||'').slice(0,80)); continue; }
@@ -1643,6 +1846,9 @@
       }catch(e){ set('ошибка: '+(e.message||e)); }
     }
     if(origin && findTab(origin)) switchTab(origin);
+    // projects taken from the library go back there
+    Object.keys(was).forEach(id => { const f = findTab(id); if(!f || was[id].open || id === activeId) return; saveProject(id); f.t.open = false; f.t.parked = was[id].parked; delete states[id]; if(f.c.tab === id){ const o = openTabs(f.c); if(!o.length) ensureTab(f.c); f.c.tab = openTabs(f.c)[0].id; } });
+    save(); renderTabs();
     qBusy = false; $('qGo').disabled = false; $('qMsg').textContent = 'Очередь завершена: собрано проектов '+done+' из '+ids.length; if(done) NATIVE.showItem(dir);
   }
 
@@ -1805,6 +2011,695 @@
     $('ttsOpen').onclick = () => { if(!V3){ toast('Озвучка доступна в новой версии программы (нужна переустановка)'); return; }
       $('ttKey').value = TTS.get('key', ''); $('ttModel').value = TTS.get('model', 'eleven_multilingual_v2'); $('ttText').value = S.lines.join('\n'); $('ttMsg').textContent = ''; $('ttsModal').classList.add('on'); if($('ttKey').value) ttsVoices(); };
     $('ttLoad').onclick = ttsVoices; $('ttGo').onclick = ttsRun; $('ttClose').onclick = () => $('ttsModal').classList.remove('on');
+  }
+
+  /* ====================== v5: re-generation, presets, thumbnail, scene sounds, chapters, backup, checks ====================== */
+  const V4 = !!(NATIVE && NATIVE.v4);
+  const txtB64 = s => b64FromBytes(new TextEncoder().encode(s));
+  const b64Txt = b => new TextDecoder().decode(bytesFromB64(b));
+  const sepOf = d => (/\\/.test(d || '') ? '\\' : '/');
+  const joinP = (d, n) => String(d).replace(/[\\/]+$/, '') + sepOf(d) + n;
+  const baseName = p => String(p || '').split(/[\\/]/).pop();
+  const isRuText = () => S.lines.some(l => /[а-яё]/i.test(l));
+  function tcFmt(t){ t = Math.max(0, Math.floor(t + 1e-6)); const h = Math.floor(t/3600), m = Math.floor(t%3600/60), s = t%60; return (h ? h+':'+String(m).padStart(2,'0') : m)+':'+String(s).padStart(2,'0'); }
+  function closeModal(m){
+    if(!m) return;
+    if(m.id === 'rgModal' && RG.busy){ toast('Идёт генерация: нажмите «Стоп» или дождитесь'); return; }
+    if(m.id === 'qModal' && qBusy) return;
+    if(m.id === 'bkModal' && BK.busy) return;
+    if(m.id === 'pfModal'){ pfDone(false); return; }
+    m.classList.remove('on');
+  }
+  ['rgModal','psModal','thModal','sxModal','cpModal','chModal','bkModal','pfModal'].forEach(id => $(id).addEventListener('mousedown', e => { if(e.target === $(id)) closeModal($(id)); }));
+
+  /* ---- per-scene data: sound and chapter, kept in S.meta[i] next to the picture and the line ---- */
+  function setMeta(i, k, v){
+    while(S.meta.length <= i) S.meta.push(null);
+    const m = Object.assign({}, S.meta[i] || {});
+    if(v == null || v === '') delete m[k]; else m[k] = v;
+    S.meta[i] = Object.keys(m).length ? m : null;
+  }
+  function metaOf(i){ return S.meta[i] || {}; }
+  function edMetaInfo(i){
+    const m = metaOf(i), a = m.sfx ? 'Звук: '+m.sfx.name : 'Звук', b = m.chap ? 'Глава ✓' : 'Глава';
+    if($('edSfx').textContent !== a){ $('edSfx').textContent = a; $('edSfx').classList.toggle('go', !!m.sfx); }
+    if($('edChap').textContent !== b) $('edChap').textContent = b;
+  }
+
+  /* ====================== 1. re-generate one scene from the editor ====================== */
+  const RG = {i:-1, n:0, busy:false, tok:0};
+  function sceneNo(i){
+    const im = S.imgs[i]; const nm = im ? (im.name || baseName(im.path)) : '';
+    const m = String(nm).match(/^image_(\d+)(?:_v\d+)?\.(?:png|jpe?g|webp)$/i); return m ? +m[1] : i+1;
+  }
+  const rgMsg = t => { $('rgMsg').textContent = t; };
+  function stageRefresh(){ const img = $('stage').querySelector('.iw img'); if(img) img.dataset.i = ''; lastShown = -1; showFrame(Math.max(0, S.starts.length ? curI() : 0), S.mode === 'idle'); }
+  function useVariant(path, name){
+    const i = RG.i, old = S.imgs[i] && S.imgs[i].path; if(!S.imgs[i] || old === path) return;
+    pushUndo();
+    // a picture that did not come from Gemini (own file) stays reachable among the variants
+    if(old && !new RegExp('^image_'+RG.n+'(?:_v\\d+)?\\.png$', 'i').test(baseName(old)) && !metaOf(i).orig) setMeta(i, 'orig', old);
+    const nu = {name, path, url:fileUrl(path)};
+    S.imgs.forEach((x, k) => { if(k === i || (old && x.path === old)) S.imgs[k] = Object.assign({}, nu); });
+    afterEdit(); stageRefresh(); $('rgCur').src = nu.url; renderVariants();
+  }
+  async function renderVariants(){
+    const box = $('rgVars'); box.innerHTML = '';
+    const dir = await genDirFor(), names = await NATIVE.gen.ls(dir), re = new RegExp('^image_'+RG.n+'(?:_v(\\d+))?\\.png$', 'i'), list = [];
+    names.forEach(nm => { const m = nm.match(re); if(m) list.push({v: m[1] ? +m[1] : 1, name:nm, path:joinP(dir, nm)}); });
+    list.sort((a, b) => a.v - b.v);
+    const cur = S.imgs[RG.i] && S.imgs[RG.i].path, orig = metaOf(RG.i).orig;
+    if(orig && !list.some(x => x.path === orig)) list.unshift({v:0, name:baseName(orig), path:orig});
+    if(cur && !list.some(x => x.path === cur)) list.unshift({v:0, name:baseName(cur), path:cur});
+    if(!list.length){ box.innerHTML = '<div class="hint" style="margin:0">Пока вариантов нет.</div>'; return; }
+    list.forEach(x => {
+      const b = document.createElement('button'); b.className = x.path === cur ? 'on' : ''; b.title = x.name;
+      const im = document.createElement('img'); im.src = fileUrl(x.path); im.alt = '';
+      const sp = document.createElement('span'); sp.textContent = x.v ? 'Вариант '+x.v : 'Исходная';
+      b.append(im, sp); b.onclick = () => { useVariant(x.path, x.name); rgMsg('Поставлена картинка «'+(x.v ? 'Вариант '+x.v : 'Исходная')+'».'); };
+      box.appendChild(b);
+    });
+    box.scrollLeft = box.scrollWidth;
+  }
+  async function openRegen(){
+    if(!NATIVE || !NATIVE.gen){ toast('Перегенерация работает только в программе AutoCut для Windows'); return; }
+    if(G.run && !RG.busy){ toast('Сейчас идёт генерация картинок в окне Gemini. Дождитесь окончания'); return; }
+    if(!S.imgs.length){ toast('В проекте нет картинок'); return; }
+    au.pause(); $('bPause').textContent = pauseTxt(1);
+    const i = curI(); RG.i = i; RG.n = sceneNo(i);
+    const prompts = parsePrompts(S.gen.text), pr = prompts[RG.n-1] || '';
+    $('rgTitle').textContent = 'Перегенерировать кадр '+(i+1) + (RG.n !== i+1 ? ' (сцена '+RG.n+' в промтах)' : '');
+    $('rgPrompt').value = pr; $('rgCur').src = S.imgs[i].url;
+    $('rgNewBox').innerHTML = '<div class="rgimg">Нажмите «Сгенерировать»</div>';
+    rgMsg(pr ? 'Проверьте промт и нажмите «Сгенерировать». Окно Gemini должно быть открыто.' : 'Для этого кадра в проекте нет промта: впишите его сами и нажмите «Сгенерировать».');
+    $('rgModal').classList.add('on'); renderVariants();
+  }
+  async function rgGo(){
+    if(RG.busy) return;
+    if(G.run){ rgMsg('Сейчас идёт генерация в окне Gemini. Дождитесь окончания.'); return; }
+    const text = $('rgPrompt').value.replace(/\s+/g, ' ').trim(); if(!text){ rgMsg('Впишите промт.'); return; }
+    const pr = parsePrompts(S.gen.text);
+    if(pr.length >= RG.n && pr[RG.n-1] !== text){ pr[RG.n-1] = text; S.gen.text = pr.join('\n\n'); touch(); }
+    else if(pr.length === RG.n-1){ pr.push(text); S.gen.text = pr.join('\n\n'); touch(); }
+    RG.busy = true; G.run = true; const tok = ++G.tok;
+    $('rgGo').disabled = true; $('rgStop').style.display = ''; $('rgNewBox').innerHTML = '<div class="rgimg">Делаю картинку…</div>';
+    try{
+      const dir = await genDirFor(), names = await NATIVE.gen.ls(dir); let v = 1;
+      names.forEach(nm => { const m = nm.match(new RegExp('^image_'+RG.n+'_v(\\d+)\\.png$', 'i')); if(m) v = Math.max(v, +m[1]); });
+      const name = 'image_'+RG.n+'_v'+(v+1)+'.png', path = joinP(dir, name), cs = cardSpec(text);
+      if(cs){ const r = await NATIVE.writeFile(dir, name, drawCard(cs)); if(!r.ok) throw new Error(r.error || 'не удалось сохранить'); }
+      else {
+        rgMsg('Подключаюсь к окну Gemini…'); G.tmp = await NATIVE.gen.tmp();
+        if(!(G.cdp && G.cdp.ws.readyState === 1)) await genConnect();
+        await G.cdp.send('Browser.setDownloadBehavior', {behavior:'allowAndName', downloadPath:G.tmp, eventsEnabled:true});
+        rgMsg('Gemini рисует картинку. Обычно это 20-60 секунд…');
+        await genScene(RG.n, text, tok, name);
+      }
+      if(tok !== G.tok) throw new Error('stopped');
+      const im = document.createElement('img'); im.className = 'rgimg'; im.src = fileUrl(path); im.alt = ''; $('rgNewBox').innerHTML = ''; $('rgNewBox').appendChild(im);
+      useVariant(path, name);
+      rgMsg('Готово: новая картинка уже стоит в видео. Не понравилась? Сгенерируйте ещё раз или выберите прежний вариант ниже.');
+    }catch(e){
+      const m = String(e && e.message || e);
+      $('rgNewBox').innerHTML = '<div class="rgimg">Нет нового варианта</div>';
+      rgMsg(m === 'stopped' ? 'Остановлено.' : /Chrome/.test(m) ? 'Окно Gemini не открыто. Нажмите «Открыть Gemini», войдите в Google и повторите.' : 'Не получилось: '+m);
+    }
+    RG.busy = false; if(tok === G.tok) G.run = false;
+    $('rgGo').disabled = false; $('rgStop').style.display = 'none';
+  }
+
+  /* ====================== 2. presets per channel ====================== */
+  const PS = {sel:''};
+  function presets(){ if(!Array.isArray(DB.presets)) DB.presets = []; return DB.presets; }
+  function presetById(id){ return id ? presets().find(p => p.id === id) || null : null; }
+  function pickSettings(st){ return JSON.parse(JSON.stringify({fx:st.fx, tr:st.tr, ql:st.ql || QD(), sb:st.sb, mu:st.mu})); }
+  function applyPresetTo(st, p){
+    const d = JSON.parse(JSON.stringify(p.data || {}));
+    st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {});
+    st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.preset = p.id;
+  }
+  function sameAsPreset(st, p){ const t = newState(); applyPresetTo(t, p); return JSON.stringify(pickSettings(st)) === JSON.stringify(pickSettings(t)); }
+  function psInfoUpd(){
+    const p = presetById(S.preset), list = presets();
+    $('psInfo').textContent = !list.length ? 'Настройте эффекты, субтитры и музыку ниже и нажмите «+», чтобы сохранить их как пресет.'
+      : p ? 'Проект на пресете «'+p.name+'»'+(sameAsPreset(S, p) ? '.' : ', но настройки после него менялись.')
+      : 'У проекта свои настройки.';
+  }
+  function renderPresets(reset){
+    if(reset) PS.sel = '';
+    const sel = $('psSel'), list = presets(), c = curCh(); sel.innerHTML = '';
+    sel.appendChild(new Option(list.length ? 'Выберите пресет' : 'Пресетов пока нет', ''));
+    list.forEach(p => sel.appendChild(new Option(p.name, p.id)));
+    const want = presetById(PS.sel) ? PS.sel : presetById(S.preset) ? S.preset : presetById(c.preset) ? c.preset : '';
+    sel.value = want; PS.sel = want;
+    const p = presetById(want);
+    $('psApply').disabled = !p; $('psDel').disabled = !p; $('psDel').style.opacity = p ? 1 : .35;
+    $('psDef').disabled = !p; $('psDef').checked = !!p && c.preset === p.id;
+    psInfoUpd();
+  }
+  $('psSel').onchange = e => { PS.sel = e.target.value; renderPresets(); };
+  $('psApply').onclick = () => {
+    const p = presetById(PS.sel); if(!p) return;
+    if(!sameAsPreset(S, p) && !confirm('Заменить настройки этого проекта (движение, переходы, качество, субтитры, музыка) настройками пресета «'+p.name+'»?')) return;
+    applyPresetTo(S, p); renderFx(); renderPost(); renderPresets(); touch(); toast('Пресет «'+p.name+'» применён');
+  };
+  $('psSave').onclick = () => {
+    const c = curCh(), p = presetById(S.preset) || presetById(PS.sel);
+    $('psName').value = p ? p.name : (c.name || 'Мой пресет');
+    $('psNameDefT').textContent = 'Ставить в новые проекты канала «'+(c.name || 'без названия')+'»';
+    $('psNameDef').checked = !c.preset || (p && c.preset === p.id);
+    $('psModal').classList.add('on'); setTimeout(() => { $('psName').focus(); $('psName').select(); }, 50);
+  };
+  function psSaveOk(){
+    const name = $('psName').value.trim(); if(!name){ toast('Впишите название пресета'); return; }
+    let p = presets().find(x => x.name.toLowerCase() === name.toLowerCase());
+    if(p && !confirm('Пресет «'+p.name+'» уже есть. Перезаписать его текущими настройками?')) return;
+    if(p) p.data = pickSettings(S); else { p = {id:uid(), name, data:pickSettings(S)}; presets().push(p); }
+    S.preset = p.id; PS.sel = p.id;
+    const c = curCh(); if($('psNameDef').checked) c.preset = p.id; else if(c.preset === p.id) c.preset = '';
+    save(); touch(); $('psModal').classList.remove('on'); renderPresets(); toast('Пресет «'+p.name+'» сохранён');
+  }
+  $('psOk').onclick = psSaveOk; $('psCancel').onclick = () => $('psModal').classList.remove('on');
+  $('psName').onkeydown = e => { if(e.key === 'Enter') psSaveOk(); };
+  $('psDel').onclick = () => {
+    const p = presetById(PS.sel); if(!p) return;
+    if(!confirm('Удалить пресет «'+p.name+'»? Проекты, где он уже применён, сохранят свои настройки.')) return;
+    DB.presets = presets().filter(x => x.id !== p.id);
+    DB.channels.forEach(c => { if(c.preset === p.id) c.preset = ''; });
+    if(S.preset === p.id) S.preset = '';
+    PS.sel = ''; save(); touch(); renderPresets(); toast('Пресет удалён');
+  };
+  $('psDef').onchange = e => { const c = curCh(); c.preset = e.target.checked ? PS.sel : ''; save(); renderPresets(); toast(e.target.checked ? 'Новые проекты канала получат этот пресет' : 'Новые проекты канала будут с обычными настройками'); };
+
+  /* ====================== 3. thumbnail 1280x720 ====================== */
+  const TH_COLORS = [['#ffffff','Белый'],['#ffd60a','Жёлтый'],['#e63946','Красный'],['#ff7a1a','Оранжевый'],['#1fbf5b','Зелёный'],['#4cc9f0','Голубой'],['#0b0b0b','Чёрный']];
+  [['thFg','#ffffff'],['thHl','#ffd60a']].forEach(([id]) => { const s = $(id); TH_COLORS.forEach(([v, n]) => s.appendChild(new Option(n, v))); });
+  const THD = () => ({src:'scene', scene:0, file:'', text:'', fg:'#ffffff', hl:'#ffd60a', box:'', pos:'left', size:100, tilt:0, dim:0.45, zoom:100, x:0, y:0});
+  const TH = {img:null, key:'', raf:0, drag:null};
+  function thState(){ if(!S.thumb) S.thumb = Object.assign(THD(), {scene:Math.max(0, S.starts.length ? curI() : 0)}); return S.thumb; }
+  function thSrc(T){
+    if(T.src === 'file' && T.file) return {key:'f:'+T.file, url:NATIVE ? fileUrl(T.file) : (TH.blob || '')};
+    const im = S.imgs[Math.max(0, Math.min(S.imgs.length-1, T.scene))]; return im ? {key:'s:'+im.path+'|'+im.url, url:im.url} : {key:'', url:''};
+  }
+  function thLoad(){
+    const T = thState(), s = thSrc(T);
+    if(s.key === TH.key && TH.img){ thDraw(); return; }
+    TH.key = s.key; TH.img = null; thDraw();
+    if(!s.url) return;
+    const im = new Image(); im.onload = () => { if(TH.key === s.key){ TH.img = im; thDraw(); } };
+    im.onerror = () => { if(TH.key === s.key){ $('thMsg').textContent = 'Картинка не найдена: её переместили или удалили.'; } };
+    im.src = s.url;
+  }
+  function thTokens(line){ const out = []; line.replace(/\*([^*]+)\*|([^*]+)/g, (m, h, p) => { if(h) out.push({t:h, hl:true}); else if(p) out.push({t:p, hl:false}); return m; }); return out; }
+  const lightColor = c => ['#ffffff','#ffd60a','#4cc9f0','#ff7a1a'].includes(c);
+  function drawThumb(cv, img, T){
+    const W = cv.width = 1280, H = cv.height = 720, g = cv.getContext('2d');
+    g.setTransform(1,0,0,1,0,0); g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+    if(img && img.naturalWidth){
+      const iw = img.naturalWidth, ih = img.naturalHeight, sc = Math.max(W/iw, H/ih) * (T.zoom/100), dw = iw*sc, dh = ih*sc, ox = (dw-W)/2, oy = (dh-H)/2;
+      g.imageSmoothingQuality = 'high'; g.drawImage(img, -ox - T.x*ox, -oy - T.y*oy, dw, dh);
+    }
+    const a = +T.dim || 0, pos = T.pos;
+    if(a > 0){
+      const sh = (x0, y0, x1, y1) => { const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, 'rgba(0,0,0,'+a+')'); gr.addColorStop(0.5, 'rgba(0,0,0,'+(a*0.55).toFixed(3)+')'); gr.addColorStop(0.85, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H); };
+      if(pos === 'left') sh(0, 0, W, 0); else if(pos === 'right') sh(W, 0, 0, 0); else if(pos === 'top') sh(0, 0, 0, H); else if(pos === 'bottom') sh(0, H, 0, 0);
+      else { g.fillStyle = 'rgba(0,0,0,'+(a*0.6).toFixed(3)+')'; g.fillRect(0, 0, W, H); }
+    }
+    const lines = String(T.text || '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, 4).map(thTokens);
+    if(!lines.length) return;
+    const side = pos === 'left' || pos === 'right', areaW = side ? W*0.62 : W*0.9, areaH = pos === 'top' || pos === 'bottom' ? H*0.42 : H*0.8, M = 54;
+    const face = '"Arial Black","Segoe UI Black",Impact,"Helvetica Neue",Arial,sans-serif';
+    const widthOf = (tk, sz) => { g.font = '900 '+sz+'px '+face; return tk.reduce((s, x) => s + g.measureText(x.t).width, 0); };
+    let size = 230; while(size > 24 && (Math.max(...lines.map(l => widthOf(l, size))) > areaW || lines.length*size*1.06 > areaH)) size -= 2;
+    size = Math.max(20, Math.round(size * (T.size || 100) / 100));
+    const lh = size*1.06, bh = lines.length*lh, top = pos === 'top' ? M : pos === 'bottom' ? H - M - bh : (H - bh)/2;
+    g.font = '900 '+size+'px '+face; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    const lw = lines.map(l => widthOf(l, size)), blockW = Math.max(...lw);
+    const cx = pos === 'left' ? M + blockW/2 : pos === 'right' ? W - M - blockW/2 : W/2, cy = top + bh/2;
+    g.save(); g.translate(cx, cy); g.rotate((+T.tilt || 0) * Math.PI/180); g.translate(-cx, -cy);
+    lines.forEach((tk, r) => {
+      const y = top + r*lh + lh/2; let x = pos === 'left' ? M : pos === 'right' ? W - M - lw[r] : (W - lw[r])/2;
+      tk.forEach(o => {
+        const w = g.measureText(o.t).width, boxed = o.hl && T.box;
+        if(boxed){ const lead = g.measureText(o.t.replace(/\S.*$/, '')).width, tw = g.measureText(o.t.trim()).width, p = size*0.12;
+          g.fillStyle = T.box; g.beginPath(); const bx = x + lead - p, by = y - size*0.58, bw = tw + p*2, bh2 = size*1.12, rr = size*0.12;
+          g.moveTo(bx+rr, by); g.arcTo(bx+bw, by, bx+bw, by+bh2, rr); g.arcTo(bx+bw, by+bh2, bx, by+bh2, rr); g.arcTo(bx, by+bh2, bx, by, rr); g.arcTo(bx, by, bx+bw, by, rr); g.fill(); }
+        if(!boxed){ g.save(); g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = size*0.2; g.shadowOffsetY = size*0.06; g.lineWidth = size*0.16; g.strokeStyle = '#000'; g.strokeText(o.t, x, y); g.restore(); }
+        g.fillStyle = boxed ? (lightColor(T.box) ? '#0b0b0b' : '#ffffff') : (o.hl ? T.hl : T.fg); g.fillText(o.t, x, y);
+        x += w;
+      });
+    });
+    g.restore();
+  }
+  function thDraw(){ cancelAnimationFrame(TH.raf); TH.raf = requestAnimationFrame(() => drawThumb($('thCv'), TH.img, thState())); }
+  function thUi(){
+    const T = thState();
+    $('thScene').max = Math.max(1, S.imgs.length); $('thScene').value = T.src === 'file' ? '' : T.scene + 1; $('thScene').placeholder = T.src === 'file' ? 'файл' : '';
+    $('thText').value = T.text; $('thFg').value = T.fg; $('thHl').value = T.hl; $('thBox').value = T.box; $('thPos').value = T.pos;
+    $('thSize').value = T.size; $('thTilt').value = String(T.tilt); $('thDim').value = String(T.dim); $('thZoom').value = T.zoom;
+  }
+  function openThumb(){
+    if(!S.imgs.length){ toast('Сначала добавьте картинки'); return; }
+    au.pause(); const T = thState(); if(T.scene >= S.imgs.length) T.scene = 0;
+    thUi(); $('thSaveAs').style.display = V4 ? '' : 'none';
+    $('thMsg').textContent = 'Сохраняется в JPG 1280x720 до 2 МБ, как требует YouTube.';
+    $('thModal').classList.add('on'); TH.key = ''; thLoad();
+  }
+  const thSet = (k, v) => { thState()[k] = v; touch(); thDraw(); };
+  const thScene = i => { const T = thState(); T.src = 'scene'; T.scene = Math.max(0, Math.min(S.imgs.length-1, i)); T.x = 0; T.y = 0; touch(); thUi(); thLoad(); };
+  $('thPrev').onclick = () => thScene(thState().scene - 1); $('thNext').onclick = () => thScene(thState().scene + 1);
+  $('thScene').onchange = e => thScene((parseInt(e.target.value, 10) || 1) - 1);
+  $('thCurBtn').onclick = () => thScene(S.starts.length ? curI() : 0);
+  $('thFileBtn').onclick = () => $('thFile').click();
+  $('thFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; const T = thState();
+    T.src = 'file'; T.file = NATIVE ? NATIVE.pathFor(f) : f.name; TH.blob = URL.createObjectURL(f); T.x = 0; T.y = 0; touch(); thUi(); thLoad(); };
+  $('thText').oninput = e => thSet('text', e.target.value);
+  [['thFg','fg'],['thHl','hl'],['thBox','box'],['thPos','pos']].forEach(([id, k]) => $(id).onchange = e => thSet(k, e.target.value));
+  $('thTilt').onchange = e => thSet('tilt', +e.target.value); $('thDim').onchange = e => thSet('dim', +e.target.value);
+  $('thSize').oninput = e => thSet('size', +e.target.value); $('thZoom').oninput = e => thSet('zoom', +e.target.value);
+  { const cv = $('thCv');
+    const ov = () => { const T = thState(), img = TH.img; if(!img) return [0, 0]; const sc = Math.max(1280/img.naturalWidth, 720/img.naturalHeight)*(T.zoom/100); return [(img.naturalWidth*sc-1280)/2, (img.naturalHeight*sc-720)/2]; };
+    cv.addEventListener('mousedown', e => { const T = thState(); TH.drag = {x:e.clientX, y:e.clientY, tx:T.x, ty:T.y, k:1280/cv.clientWidth}; cv.classList.add('drag'); e.preventDefault(); });
+    window.addEventListener('mousemove', e => { if(!TH.drag) return; const T = thState(), d = TH.drag, [ox, oy] = ov();
+      if(ox > 0) T.x = Math.max(-1, Math.min(1, d.tx - (e.clientX - d.x)*d.k/ox)); if(oy > 0) T.y = Math.max(-1, Math.min(1, d.ty - (e.clientY - d.y)*d.k/oy)); thDraw(); });
+    window.addEventListener('mouseup', () => { if(TH.drag){ TH.drag = null; cv.classList.remove('drag'); touch(); } });
+    cv.addEventListener('wheel', e => { e.preventDefault(); const T = thState(); T.zoom = Math.max(100, Math.min(250, T.zoom + (e.deltaY < 0 ? 10 : -10))); $('thZoom').value = T.zoom; touch(); thDraw(); }, {passive:false});
+  }
+  function thJpeg(){
+    const cv = document.createElement('canvas'); drawThumb(cv, TH.img, thState());
+    let q = 0.92, b64 = '';
+    for(; q >= 0.55; q -= 0.07){ b64 = cv.toDataURL('image/jpeg', q).split(',')[1]; if(b64.length*0.75 < 1990000) break; }
+    return b64;
+  }
+  async function thSaveTo(dir){
+    if(!thState().text.trim() && !confirm('На обложке нет текста. Сохранить так?')) return;
+    let b64; try{ b64 = thJpeg(); }catch(e){ $('thMsg').textContent = 'Не удалось подготовить картинку: '+e.message; return; }
+    const names = await NATIVE.gen.ls(dir); let k = 1; while(names.includes('thumbnail_'+String(k).padStart(2,'0')+'.jpg')) k++;
+    const name = 'thumbnail_'+String(k).padStart(2,'0')+'.jpg', r = await NATIVE.writeFile(dir, name, b64);
+    if(!r.ok){ $('thMsg').textContent = 'Не удалось сохранить: '+r.error; return; }
+    $('thMsg').textContent = 'Сохранено: '+r.path+' ('+Math.round(b64.length*0.75/1024)+' КБ)'; NATIVE.showItem(r.path); toast('Обложка сохранена');
+  }
+  $('thSave').onclick = async () => {
+    if(!NATIVE){ try{ const a = document.createElement('a'); a.href = 'data:image/jpeg;base64,'+thJpeg(); a.download = 'thumbnail.jpg'; a.click(); }catch(e){ toast('Не удалось сохранить'); } return; }
+    if(!V3){ toast('Нужна новая версия программы (переустановка)'); return; }
+    thSaveTo(await genDirFor());
+  };
+  $('thSaveAs').onclick = async () => { const d = await NATIVE.pickDir('Куда сохранить обложку'); if(d) thSaveTo(d); };
+  $('thClose').onclick = () => $('thModal').classList.remove('on');
+
+  /* ====================== 4. sounds on scenes ====================== */
+  const SFX_LIB = [['boom','Удар'],['click','Щелчок'],['whoosh','Вжух'],['ding','Динь'],['pop','Поп'],['scratch','Скретч'],['trombone','Грустный тромбон']];
+  function sfxList(){
+    const out = [], n = Math.min(S.starts.length, S.meta.length);
+    for(let i = 0; i < n; i++){ const m = S.meta[i]; if(m && m.sfx && m.sfx.path) out.push({i, at:Math.max(0, S.starts[i] + (+m.sfx.off || 0)), path:m.sfx.path, vol:(m.sfx.vol == null ? 100 : +m.sfx.vol)/100, name:m.sfx.name}); }
+    return out;
+  }
+  function wavB64(buf){
+    const ch = buf.getChannelData(0), n = ch.length, sr = buf.sampleRate; let peak = 0;
+    for(let i = 0; i < n; i++){ const v = Math.abs(ch[i]); if(v > peak) peak = v; }
+    const gn = peak > 0 ? 0.6/peak : 1, ab = new ArrayBuffer(44 + n*2), dv = new DataView(ab), str = (o, t) => { for(let i = 0; i < t.length; i++) dv.setUint8(o+i, t.charCodeAt(i)); };
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n*2, true); str(8, 'WAVE'); str(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr*2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n*2, true);
+    const fadeN = Math.min(n, Math.round(sr*0.012));
+    for(let i = 0; i < n; i++){ let v = ch[i]*gn; if(i > n - fadeN) v *= (n - i)/fadeN; dv.setInt16(44 + i*2, Math.round(Math.max(-1, Math.min(1, v))*32767), true); }
+    return b64FromBytes(new Uint8Array(ab));
+  }
+  async function synthSfx(kind){
+    const SR = 44100, LEN = {boom:1.5, click:0.12, whoosh:0.85, ding:1.9, pop:0.22, scratch:0.55, trombone:3.0}[kind] || 1;
+    const ctx = new OfflineAudioContext(1, Math.ceil(SR*LEN), SR), out = ctx.destination;
+    const osc = (type, f) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; return o; };
+    const gain = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
+    const filt = (type, f, q) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if(q) b.Q.value = q; return b; };
+    const noise = sec => { const b = ctx.createBuffer(1, Math.ceil(SR*sec), SR), d = b.getChannelData(0); let s = 22222; for(let i = 0; i < d.length; i++){ s = (s*1103515245 + 12345) & 0x7fffffff; d[i] = s/0x3fffffff - 1; } const src = ctx.createBufferSource(); src.buffer = b; return src; };
+    const env = (g, pts) => { g.gain.setValueAtTime(pts[0][1], pts[0][0]); pts.slice(1).forEach(([t, v, e]) => e ? g.gain.exponentialRampToValueAtTime(Math.max(v, 1e-4), t) : g.gain.linearRampToValueAtTime(v, t)); };
+    if(kind === 'boom'){
+      const o = osc('sine', 120); o.frequency.setValueAtTime(130, 0); o.frequency.exponentialRampToValueAtTime(36, 0.7);
+      const sh = ctx.createWaveShaper(), cv = new Float32Array(1024); for(let i = 0; i < 1024; i++) cv[i] = Math.tanh(2.4*(i/511.5 - 1)); sh.curve = cv;
+      const g = gain(0); env(g, [[0, 0], [0.004, 1], [1.45, 0.001, 1]]); o.connect(sh).connect(g).connect(out); o.start(0); o.stop(LEN);
+      const nz = noise(0.5), lp = filt('lowpass', 2000); lp.frequency.setValueAtTime(2200, 0); lp.frequency.exponentialRampToValueAtTime(160, 0.3);
+      const ng = gain(0); env(ng, [[0, 0.9], [0.32, 0.001, 1]]); nz.connect(lp).connect(ng).connect(out); nz.start(0);
+    } else if(kind === 'click'){
+      const nz = noise(0.02), hp = filt('highpass', 2500), ng = gain(0); env(ng, [[0, 1], [0.012, 0.001, 1]]); nz.connect(hp).connect(ng).connect(out); nz.start(0);
+      const o = osc('sine', 1900), g = gain(0); env(g, [[0, 0], [0.001, 0.7], [0.05, 0.001, 1]]); o.connect(g).connect(out); o.start(0); o.stop(0.1);
+    } else if(kind === 'whoosh'){
+      const nz = noise(LEN), bp = filt('bandpass', 300, 1.4); bp.frequency.setValueAtTime(260, 0); bp.frequency.exponentialRampToValueAtTime(2600, 0.42); bp.frequency.exponentialRampToValueAtTime(650, 0.85);
+      const g = gain(0); env(g, [[0, 0], [0.4, 1], [0.84, 0.001, 1]]); nz.connect(bp).connect(g).connect(out); nz.start(0);
+      const nz2 = noise(LEN), bp2 = filt('bandpass', 900, 3); bp2.frequency.setValueAtTime(500, 0); bp2.frequency.exponentialRampToValueAtTime(4200, 0.45); bp2.frequency.exponentialRampToValueAtTime(1200, 0.85);
+      const g2 = gain(0); env(g2, [[0, 0], [0.42, 0.35], [0.8, 0.001, 1]]); nz2.connect(bp2).connect(g2).connect(out); nz2.start(0);
+    } else if(kind === 'ding'){
+      [[1318.5, 1, 1.85], [2637, 0.35, 1.0], [3955, 0.14, 0.6], [5274, 0.06, 0.35]].forEach(([f, a, d]) => { const o = osc('sine', f), g = gain(0); env(g, [[0, 0], [0.003, a], [d, 0.0005, 1]]); o.connect(g).connect(out); o.start(0); o.stop(LEN); });
+    } else if(kind === 'pop'){
+      const o = osc('sine', 900); o.frequency.setValueAtTime(950, 0); o.frequency.exponentialRampToValueAtTime(170, 0.09);
+      const g = gain(0); env(g, [[0, 0], [0.002, 1], [0.18, 0.001, 1]]); o.connect(g).connect(out); o.start(0); o.stop(LEN);
+      const nz = noise(0.02), ng = gain(0); env(ng, [[0, 0.4], [0.01, 0.001, 1]]); nz.connect(filt('highpass', 1500)).connect(ng).connect(out); nz.start(0);
+    } else if(kind === 'scratch'){
+      const nz = noise(LEN), bp = filt('bandpass', 600, 5), f = bp.frequency;
+      f.setValueAtTime(500, 0); f.linearRampToValueAtTime(3200, 0.12); f.linearRampToValueAtTime(420, 0.24); f.linearRampToValueAtTime(2600, 0.36); f.linearRampToValueAtTime(380, 0.52);
+      const g = gain(0); env(g, [[0, 0], [0.015, 1], [0.22, 0.7], [0.25, 1], [0.53, 0.001, 1]]); nz.connect(bp).connect(g).connect(out); nz.start(0);
+      const o = osc('sawtooth', 90), of = o.frequency; of.setValueAtTime(70, 0); of.linearRampToValueAtTime(420, 0.12); of.linearRampToValueAtTime(60, 0.24); of.linearRampToValueAtTime(330, 0.36); of.linearRampToValueAtTime(50, 0.52);
+      const og = gain(0); env(og, [[0, 0], [0.02, 0.25], [0.5, 0.001, 1]]); o.connect(filt('lowpass', 1500)).connect(og).connect(out); o.start(0); o.stop(LEN);
+    } else if(kind === 'trombone'){
+      const master = gain(0.6); master.connect(out);
+      [[293.66, 0, 0.44], [277.18, 0.5, 0.44], [261.63, 1.0, 0.44], [246.94, 1.5, 1.4]].forEach(([fr, t0, d], k) => {
+        const last = k === 3, lp = filt('lowpass', 400, 4), g = gain(0);
+        lp.frequency.setValueAtTime(380, t0); lp.frequency.linearRampToValueAtTime(1500, t0 + 0.13); lp.frequency.linearRampToValueAtTime(800, t0 + d);
+        env(g, [[t0, 0], [t0 + 0.04, 0.5], [t0 + d - 0.07, 0.45], [t0 + d, 0.0001]]);
+        [1, 1.004].forEach(det => { const o = osc('sawtooth', fr*det); if(last){ const lfo = osc('sine', 5.5), lg = gain(0); lg.gain.setValueAtTime(0, t0); lg.gain.linearRampToValueAtTime(7, t0 + 0.5); lfo.connect(lg).connect(o.frequency); lfo.start(t0); lfo.stop(t0 + d); }
+          o.connect(lp); o.start(t0); o.stop(t0 + d + 0.02); });
+        lp.connect(g).connect(master);
+      });
+    }
+    return wavB64(await ctx.startRendering());
+  }
+  async function sfxPath(kind){
+    const dir = joinP(await NATIVE.tool.dir(), 'sfx'), name = kind+'_v2.wav', p = joinP(dir, name);
+    if(await NATIVE.gen.size(p) > 0) return p;
+    const r = await NATIVE.writeFile(dir, name, await synthSfx(kind)); if(!r.ok) throw new Error(r.error || 'не удалось сохранить звук');
+    return r.path;
+  }
+  const SX = {i:0, au:null};
+  function sfxPreview(path, vol){ try{ if(SX.au) SX.au.pause(); const a = new Audio(fileUrl(path)); a.volume = Math.max(0, Math.min(1, (vol == null ? 100 : vol)/100 * (au.volume || 1))); SX.au = a; a.play().catch(() => {}); }catch(e){} }
+  function renderSfx(){
+    const m = metaOf(SX.i).sfx, box = $('sxList'); box.innerHTML = '';
+    SFX_LIB.forEach(([k, label]) => {
+      const el = document.createElement('div'); el.className = 'sxi' + (m && m.kind === k ? ' on' : '');
+      const b = document.createElement('b'); b.textContent = label; const pv = document.createElement('i'); pv.textContent = '▶'; pv.title = 'Послушать';
+      pv.onclick = async ev => { ev.stopPropagation(); try{ sfxPreview(await sfxPath(k), 100); }catch(e){ toast('Звук не готов: '+e.message); } };
+      el.onclick = async () => { try{ const p = await sfxPath(k); sfxSet({kind:k, name:label, path:p}); sfxPreview(p, metaOf(SX.i).sfx.vol); }catch(e){ toast('Звук не готов: '+e.message); } };
+      el.append(b, pv); box.appendChild(el);
+    });
+    $('sxCur').textContent = m ? 'На кадре: '+m.name+(m.kind === 'file' ? ' (свой файл)' : '') : 'Звука на этом кадре нет';
+    $('sxVol').value = m ? m.vol : 100; $('sxOff').value = m ? String(m.off || 0) : '0';
+    ['sxVol','sxOff','sxTry','sxDel'].forEach(id => $(id).disabled = !m);
+  }
+  function sfxSet(x){
+    const cur = metaOf(SX.i).sfx; pushUndo();
+    setMeta(SX.i, 'sfx', {kind:x.kind, name:x.name, path:x.path, vol:cur ? cur.vol : 100, off:cur ? cur.off : 0});
+    afterEdit(); renderSfx();
+  }
+  function openSfx(){
+    if(!NATIVE){ toast('Звуки на кадрах работают только в программе AutoCut для Windows'); return; }
+    if(!V3){ toast('Нужна новая версия программы (переустановка)'); return; }
+    au.pause(); $('bPause').textContent = pauseTxt(1);
+    SX.i = curI(); $('sxTitle').textContent = 'Звук на кадре '+(SX.i+1);
+    $('sxSub').textContent = 'Начало кадра '+tcFmt(S.starts[SX.i])+(S.lines[SX.i] ? ' · '+S.lines[SX.i].slice(0, 110) : '');
+    renderSfx(); $('sxModal').classList.add('on');
+  }
+  $('sxFileBtn').onclick = () => $('sxFile').click();
+  $('sxFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; const p = NATIVE.pathFor(f); if(!p){ toast('Не удалось получить путь к файлу'); return; }
+    sfxSet({kind:'file', name:f.name.replace(/\.[^.]+$/, ''), path:p}); sfxPreview(p, metaOf(SX.i).sfx.vol); };
+  $('sxVol').oninput = e => { const m = metaOf(SX.i).sfx; if(!m) return; setMeta(SX.i, 'sfx', Object.assign({}, m, {vol:+e.target.value})); touch(); };
+  $('sxVol').onchange = () => { const m = metaOf(SX.i).sfx; if(m) sfxPreview(m.path, m.vol); };
+  $('sxOff').onchange = e => { const m = metaOf(SX.i).sfx; if(!m) return; pushUndo(); setMeta(SX.i, 'sfx', Object.assign({}, m, {off:+e.target.value})); afterEdit(); };
+  $('sxDel').onclick = () => { if(!metaOf(SX.i).sfx) return; pushUndo(); setMeta(SX.i, 'sfx', null); afterEdit(); renderSfx(); };
+  $('sxTry').onclick = () => {
+    const m = metaOf(SX.i).sfx; if(!m) return; const at = Math.max(0, S.starts[SX.i] + (+m.off || 0));
+    $('sxModal').classList.remove('on'); seekTo(Math.max(0, at - 1.2)); const tok = ++ED.playTok; au.play(); $('bPause').textContent = pauseTxt(0);
+    setTimeout(() => { if(tok === ED.playTok && S.mode === 'review'){ au.pause(); $('bPause').textContent = pauseTxt(1); } }, 3400);
+  };
+  $('sxClose').onclick = () => $('sxModal').classList.remove('on');
+  // sounds are heard while the result is played back
+  const SFP = {last:null};
+  function sfxTick(){
+    if(S.mode !== 'review' || au.paused || !S.meta.length){ SFP.last = null; return; }
+    const t = au.currentTime, l = SFP.last; SFP.last = t;
+    if(l != null && (t < l || t - l > 0.6)) return;
+    for(let i = 0; i < S.meta.length && i < S.starts.length; i++){
+      const m = S.meta[i]; if(!m || !m.sfx) continue; const at = Math.max(0, S.starts[i] + (+m.sfx.off || 0));
+      if(l == null ? (at <= t && t - at < 0.25) : (at > l && at <= t)) sfxPreview(m.sfx.path, m.sfx.vol);
+    }
+  }
+
+  /* ====================== 5. chapters and description ====================== */
+  const CP = {i:0, snap:null};
+  function suggestTitle(i){
+    if(i === 0) return isRuText() ? 'Вступление' : 'Intro';
+    let t = String(S.lines[i] || '').replace(/\[CARD:[^\]]*\]/ig, '').replace(/["«»“”]/g, '').trim();
+    const ws = t.split(/\s+/).filter(Boolean); t = ws.slice(0, 6).join(' ').replace(/[,.;:!?…—–-]+$/, '');
+    if(ws.length > 6) t += '…';
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Глава '+(i+1);
+  }
+  function chapList(){
+    const out = [];
+    for(let i = 0; i < S.starts.length; i++){ const m = S.meta[i]; if(m && m.chap) out.push({i, t:S.starts[i], title:m.chap}); }
+    if(out.length && out[0].i !== 0) out.unshift({i:0, t:0, title:isRuText() ? 'Вступление' : 'Intro', auto:true});
+    return out;
+  }
+  function openChap(){
+    au.pause(); $('bPause').textContent = pauseTxt(1);
+    const i = curI(); CP.i = i;
+    $('cpSub').textContent = 'Кадр '+(i+1)+' · '+tcFmt(S.starts[i])+(S.lines[i] ? ' · '+S.lines[i].slice(0, 90) : '');
+    $('cpName').value = metaOf(i).chap || suggestTitle(i); $('cpDel').style.display = metaOf(i).chap ? '' : 'none';
+    $('cpModal').classList.add('on'); setTimeout(() => { $('cpName').focus(); $('cpName').select(); }, 50);
+  }
+  function cpOk(){ const v = $('cpName').value.trim(); if(!v){ toast('Впишите название главы'); return; } pushUndo(); setMeta(CP.i, 'chap', v); afterEdit(); $('cpModal').classList.remove('on'); toast('Глава отмечена: '+tcFmt(S.starts[CP.i])+' '+v); }
+  $('cpOk').onclick = cpOk; $('cpName').onkeydown = e => { if(e.key === 'Enter') cpOk(); };
+  $('cpDel').onclick = () => { pushUndo(); setMeta(CP.i, 'chap', null); afterEdit(); $('cpModal').classList.remove('on'); };
+  $('cpCancel').onclick = () => $('cpModal').classList.remove('on');
+  function chText(){
+    const list = chapList(), desc = String(S.desc || '').trim();
+    return (desc ? desc + '\n\n' : '') + list.map(c => tcFmt(c.t)+' '+c.title).join('\n');
+  }
+  function renderChapters(){
+    const box = $('chList'), list = chapList(); box.innerHTML = '';
+    if(!list.length) box.innerHTML = '<div class="hint" style="margin:0 0 8px">Глав пока нет. Нажмите «Предложить главы» или отметьте их на кадрах кнопкой «Глава» в редакторе.</div>';
+    list.forEach(c => {
+      const row = document.createElement('div'); row.className = 'chrow';
+      const tc = document.createElement('span'); tc.className = 'tc'; tc.textContent = tcFmt(c.t);
+      const inp = document.createElement('input'); inp.className = 'inp'; inp.value = c.title; inp.maxLength = 80; inp.spellcheck = false;
+      inp.onfocus = () => { CP.snap = snap(); };
+      inp.oninput = () => { setMeta(c.i, 'chap', inp.value.trim() || ' '); touch(); edDirty = true; $('chOut').value = chText(); };
+      inp.onchange = () => { if(CP.snap){ pushUndo(CP.snap); CP.snap = null; } if(!inp.value.trim()){ setMeta(c.i, 'chap', null); renderChapters(); } };
+      const go = document.createElement('button'); go.className = 'btn'; go.textContent = 'Перейти'; go.onclick = () => { $('chModal').classList.remove('on'); gotoFrame(c.i); };
+      const del = document.createElement('button'); del.className = 'btn'; del.innerHTML = '&times;'; del.title = 'Убрать главу'; del.disabled = !!c.auto;
+      del.onclick = () => { pushUndo(); setMeta(c.i, 'chap', null); afterEdit(); renderChapters(); };
+      row.append(tc, inp, go, del); box.appendChild(row);
+    });
+    const w = [], real = list.length;
+    if(S.starts.length < 2) w.push(['err', 'Видео ещё не размечено: времени для глав пока нет.']);
+    if(real && real < 3) w.push(['warn', 'YouTube показывает главы, только если их три или больше. Сейчас: '+real+'.']);
+    list.forEach((c, k) => { const end = k < list.length-1 ? list[k+1].t : S.dur; if(end - c.t < 10) w.push(['warn', 'Глава «'+c.title+'» короче 10 секунд: YouTube такие главы не принимает.']); });
+    if(list.length && list[0].auto) w.push(['ok', 'Первая глава 0:00 добавлена сама: YouTube требует, чтобы список начинался с 0:00.']);
+    $('chWarn').innerHTML = ''; w.forEach(([c, t]) => { const d = document.createElement('div'); d.className = 'pfi '+c; d.innerHTML = '<b></b><span></span>'; d.firstChild.textContent = c === 'err' ? 'Ошибка' : c === 'warn' ? 'Внимание' : 'Готово'; d.lastChild.textContent = t; $('chWarn').appendChild(d); });
+    $('chOut').value = chText();
+  }
+  function openChapters(){ au.pause(); $('bPause').textContent = pauseTxt(1); $('chDesc').value = S.desc || ''; renderChapters(); $('chModal').classList.add('on'); }
+  $('chAuto').onclick = () => {
+    const n = S.starts.length, dur = S.dur; if(n < 2 || !dur){ toast('Сначала разметьте видео'); return; }
+    if(dur < 40){ toast('Видео слишком короткое для глав'); return; }
+    if(chapList().some(c => !c.auto) && !confirm('Заменить уже отмеченные главы новыми?')) return;
+    const want = +$('chCount').value || Math.max(3, Math.min(10, Math.round(dur/100))), K = Math.max(3, Math.min(want, Math.floor(dur/10)));
+    pushUndo(); for(let i = 0; i < n; i++) setMeta(i, 'chap', null);
+    const minGap = Math.max(10, dur/K*0.5); let prev = 0; const picks = [0];
+    for(let k = 1; k < K; k++){
+      const target = k*dur/K; let best = -1, bd = 1e9;
+      for(let i = prev+1; i < n; i++){ const t = S.starts[i]; if(t - S.starts[prev] < minGap || dur - t < 10) continue; const dd = Math.abs(t - target); if(dd < bd){ bd = dd; best = i; } }
+      if(best > 0){ picks.push(best); prev = best; }
+    }
+    picks.forEach(i => setMeta(i, 'chap', suggestTitle(i)));
+    afterEdit(); renderChapters(); toast('Предложено глав: '+picks.length+'. Поправьте названия');
+  };
+  $('chClear').onclick = () => { if(!chapList().some(c => !c.auto)) return; if(!confirm('Убрать все главы?')) return; pushUndo(); for(let i = 0; i < S.meta.length; i++) setMeta(i, 'chap', null); afterEdit(); renderChapters(); };
+  $('chDesc').oninput = e => { S.desc = e.target.value; touch(); $('chOut').value = chText(); };
+  $('chCopy').onclick = async () => { const t = $('chOut').value; try{ await navigator.clipboard.writeText(t); toast('Скопировано'); }catch(e){ $('chOut').focus(); $('chOut').select(); try{ document.execCommand('copy'); toast('Скопировано'); }catch(e2){ toast('Выделите текст и нажмите Ctrl+C'); } } };
+  $('chClose').onclick = () => $('chModal').classList.remove('on');
+
+  /* ====================== 6. backup and restore ====================== */
+  const BK = {busy:false};
+  const bkMsg = t => { $('bkMsg').textContent = t; };
+  const bkBar = v => { $('bkWrap').style.display = ''; $('bkBar').style.width = Math.round(Math.max(0, Math.min(1, v))*100)+'%'; };
+  function stamp(){ const d = new Date(), z = n => String(n).padStart(2, '0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+'-'+z(d.getMinutes()); }
+  const extOf = p => { const m = String(p || '').match(/\.([A-Za-z0-9]{1,5})$/); return m ? '.'+m[1].toLowerCase() : ''; };
+  const BK_README = 'Резервная копия проекта AutoCut.\r\n\r\nКак вернуть проект: откройте AutoCut, нажмите «Резервная копия», затем «Восстановить из копии…» и выберите эту папку.\r\nНе переименовывайте и не удаляйте файлы внутри: проект ссылается на них по именам.\r\n';
+  function projData(id){
+    if(id === activeId) saveProject(id);
+    if(states[id]) return JSON.parse(JSON.stringify(serialize(states[id])));
+    try{ return JSON.parse(localStorage.getItem(pKey(id)) || 'null'); }catch(e){ return null; }
+  }
+  async function backupProject(id, dir, onp){
+    const f = findTab(id), d = projData(id); if(!f || !d) throw new Error('проект не найден');
+    const map = new Map(), jobs = [], cnt = {img:0, sfx:0, file:0};
+    const take = (p, kind) => {
+      if(!p) return ''; if(map.has(p)) return map.get(p);
+      const e = extOf(p); let nm;
+      if(kind === 'img') nm = 'img_'+String(++cnt.img).padStart(4, '0')+(e || '.png');
+      else if(kind === 'voice') nm = 'voice'+(e || '.mp3'); else if(kind === 'music') nm = 'music'+(e || '.mp3');
+      else if(kind === 'sfx') nm = 'sfx_'+String(++cnt.sfx).padStart(2, '0')+(e || '.wav'); else nm = 'file_'+String(++cnt.file).padStart(2, '0')+e;
+      map.set(p, nm); jobs.push([p, nm]); return nm;
+    };
+    const out = JSON.parse(JSON.stringify(d));
+    out.imgs = (d.imgs || []).map(i => ({name:i.name, path:take(i.path, 'img')}));
+    out.audioPath = take(d.audioPath, 'voice');
+    if(out.mu) out.mu.path = take(d.mu && d.mu.path, 'music');
+    out.meta = (d.meta || []).map(m => { if(!m) return null; const c = JSON.parse(JSON.stringify(m)); if(c.sfx && c.sfx.path) c.sfx.path = take(m.sfx.path, 'sfx'); if(c.orig) c.orig = take(m.orig, 'img'); return c; });
+    if(out.gen){ const man = {}; Object.keys((d.gen && d.gen.manual) || {}).forEach(k => man[k] = take(d.gen.manual[k], 'img')); out.gen.manual = man; out.gen.dir = ''; }
+    if(out.thumb && out.thumb.src === 'file' && out.thumb.file) out.thumb.file = take(out.thumb.file, 'img');
+    const missing = []; let k = 0;
+    for(const [src, nm] of jobs){
+      const r = await NATIVE.copyFile(src, dir, nm); if(!r.ok) missing.push(baseName(src));
+      k++; if(onp) onp(k/(jobs.length + 1));
+    }
+    const pr = presetById(d.preset);
+    const doc = {format:'autocut-project', version:1, created:new Date().toISOString(), name:f.t.name, channel:f.c.name, channelSub:f.c.sub || '',
+      preset:pr ? {name:pr.name, data:pr.data} : null, parked:!!f.t.parked, missing, state:out};
+    const w = await NATIVE.writeFile(dir, 'project.autocut.json', txtB64(JSON.stringify(doc))); if(!w.ok) throw new Error(w.error || 'не удалось записать файл проекта');
+    await NATIVE.writeFile(dir, 'README.txt', txtB64('﻿'+BK_README));
+    if(onp) onp(1);
+    return {files:jobs.length, missing};
+  }
+  async function bkRun(all){
+    if(BK.busy) return;
+    const root = await NATIVE.pickDir(all ? 'Куда сохранить копию всех проектов' : 'Куда сохранить копию проекта'); if(!root) return;
+    BK.busy = true; ['bkOne','bkAll','bkRestore','bkClose'].forEach(id => $(id).disabled = true); bkBar(0);
+    try{
+      if(!all){
+        const f = findTab(activeId), dir = joinP(root, safeFile('AutoCut '+(f ? f.t.name : 'проект')+' '+stamp()));
+        bkMsg('Копирую файлы проекта…');
+        const r = await backupProject(activeId, dir, bkBar);
+        bkMsg('Готово: '+r.files+' файлов в папке '+dir+(r.missing.length ? '. Не найдены и не скопированы: '+r.missing.slice(0, 5).join(', ')+(r.missing.length > 5 ? ' и ещё '+(r.missing.length-5) : '') : '.'));
+        NATIVE.showItem(joinP(dir, 'project.autocut.json'));
+      } else {
+        const list = []; DB.channels.forEach(c => c.tabs.forEach(t => { let has = !!states[t.id]; if(!has) try{ has = !!localStorage.getItem(pKey(t.id)); }catch(e){} const m = t.sum || {}; if(has && (m.n || m.audio || m.t || m.rec || states[t.id])) list.push({c, t}); }));
+        if(!list.length) throw new Error('нет проектов с файлами');
+        const top = joinP(root, safeFile('AutoCut все проекты '+stamp())), idx = {format:'autocut-all', version:1, created:new Date().toISOString(),
+          channels:DB.channels.map(c => ({name:c.name, sub:c.sub || '', preset:(presetById(c.preset) || {}).name || ''})), presets:presets(), projects:[]};
+        let miss = 0, files = 0;
+        for(let k = 0; k < list.length; k++){
+          const {c, t} = list[k], folder = String(k+1).padStart(2, '0')+' '+safeFile((c.name || 'Канал')+' - '+(t.name || 'Видео'));
+          bkMsg('Проект '+(k+1)+' из '+list.length+': '+(t.name || ''));
+          const r = await backupProject(t.id, joinP(top, folder), v => bkBar((k + v)/list.length));
+          idx.projects.push({folder, channel:c.name, name:t.name}); miss += r.missing.length; files += r.files;
+        }
+        const w = await NATIVE.writeFile(top, 'autocut-all.json', txtB64(JSON.stringify(idx))); if(!w.ok) throw new Error(w.error);
+        await NATIVE.writeFile(top, 'README.txt', txtB64('﻿'+BK_README.replace('проекта', 'всех проектов')));
+        bkBar(1); bkMsg('Готово: проектов '+list.length+', файлов '+files+'. Папка: '+top+(miss ? '. Не найдено файлов: '+miss+' (их уже не было на диске).' : '.'));
+        NATIVE.showItem(joinP(top, 'autocut-all.json'));
+      }
+    }catch(e){ bkMsg('Не получилось: '+(e.message || e)); }
+    BK.busy = false; ['bkOne','bkAll','bkRestore','bkClose'].forEach(id => $(id).disabled = false);
+  }
+  function restoreProject(doc, dir, open){
+    if(!doc || doc.format !== 'autocut-project' || !doc.state) throw new Error('файл копии повреждён');
+    let c = DB.channels.find(x => x.name === doc.channel), fresh = false;
+    if(!c){ c = {id:uid(), name:doc.channel || 'Канал', sub:doc.channelSub || '', tabs:[], tab:null}; DB.channels.push(c); fresh = true; }
+    let pid = '';
+    if(doc.preset && doc.preset.name){ let p = presets().find(x => x.name === doc.preset.name); if(!p){ p = {id:uid(), name:doc.preset.name, data:doc.preset.data}; presets().push(p); } pid = p.id; if(fresh) c.preset = p.id; }
+    const abs = r => r ? joinP(dir, r) : '', st = JSON.parse(JSON.stringify(doc.state));
+    st.imgs = (st.imgs || []).map(i => ({name:i.name, path:abs(i.path)}));
+    st.audioPath = abs(st.audioPath); if(st.mu) st.mu.path = abs(st.mu.path);
+    st.meta = (st.meta || []).map(m => { if(m && m.sfx && m.sfx.path) m.sfx.path = abs(m.sfx.path); if(m && m.orig) m.orig = abs(m.orig); return m; });
+    if(st.gen){ Object.keys(st.gen.manual || {}).forEach(k => st.gen.manual[k] = abs(st.gen.manual[k])); st.gen.dir = ''; st.gen.key = ''; }
+    if(st.thumb && st.thumb.src === 'file' && st.thumb.file) st.thumb.file = abs(st.thumb.file);
+    st.preset = pid;
+    const name = c.tabs.some(t => t.name === doc.name) ? (doc.name || 'Видео')+' (из копии)' : (doc.name || 'Видео');
+    const t = {id:uid(), name, open:!!open, parked:!open && !!doc.parked, updated:Date.now()}; c.tabs.push(t);
+    try{ localStorage.setItem(pKey(t.id), JSON.stringify(st)); }catch(e){ throw new Error('не хватает места для проекта'); }
+    hydrate(t.id); saveProject(t.id); if(!open) delete states[t.id];
+    if(!c.tab) c.tab = t.id;
+    save(); return t.id;
+  }
+  async function bkRestore(){
+    if(BK.busy) return;
+    const dir = await NATIVE.pickDir('Выберите папку резервной копии AutoCut'); if(!dir) return;
+    BK.busy = true; ['bkOne','bkAll','bkRestore','bkClose'].forEach(id => $(id).disabled = true);
+    try{
+      const one = await NATIVE.readFile(joinP(dir, 'project.autocut.json'));
+      if(one){
+        const doc = JSON.parse(b64Txt(one)), id = restoreProject(doc, dir, true);
+        bkMsg('Проект «'+doc.name+'» восстановлен. Файлы остаются в папке копии: не удаляйте её.');
+        $('bkModal').classList.remove('on'); setView('work'); switchTab(id); toast('Проект восстановлен');
+      } else {
+        const all = await NATIVE.readFile(joinP(dir, 'autocut-all.json'));
+        if(!all) throw new Error('в этой папке нет копии AutoCut. Выберите папку, где лежит project.autocut.json или autocut-all.json');
+        const idx = JSON.parse(b64Txt(all)); let ok = 0, bad = 0;
+        (idx.presets || []).forEach(p => { if(p && p.name && !presets().some(x => x.name === p.name)) presets().push({id:uid(), name:p.name, data:p.data}); });
+        (idx.channels || []).forEach(ch => { if(!DB.channels.some(x => x.name === ch.name)){ const p = presets().find(x => x.name === ch.preset); DB.channels.push({id:uid(), name:ch.name, sub:ch.sub || '', tabs:[], tab:null, preset:p ? p.id : ''}); } });
+        for(let k = 0; k < (idx.projects || []).length; k++){
+          const pj = idx.projects[k], sub = joinP(dir, pj.folder); bkBar(k/idx.projects.length); bkMsg('Восстанавливаю '+(k+1)+' из '+idx.projects.length+': '+pj.name);
+          try{ const b = await NATIVE.readFile(joinP(sub, 'project.autocut.json')); if(!b) throw new Error('нет файла'); restoreProject(JSON.parse(b64Txt(b)), sub, false); ok++; }catch(e){ bad++; }
+        }
+        DB.channels.forEach(c => ensureTab(c)); save(); renderChannels(); renderTabs(); renderPresets(); bkBar(1);
+        bkMsg('Восстановлено проектов: '+ok+(bad ? ', не удалось: '+bad : '')+'. Они в библиотеке. Файлы остаются в папке копии: не удаляйте её.');
+      }
+    }catch(e){ bkMsg('Не получилось: '+(e.message || e)); }
+    BK.busy = false; ['bkOne','bkAll','bkRestore','bkClose'].forEach(id => $(id).disabled = false);
+  }
+  $('bkOne').onclick = () => bkRun(false); $('bkAll').onclick = () => bkRun(true); $('bkRestore').onclick = bkRestore;
+  $('bkClose').onclick = () => { if(!BK.busy) $('bkModal').classList.remove('on'); };
+
+  /* ====================== 7. checks before building ====================== */
+  function subRows(vert){
+    const size = vert ? Math.round((parseInt(S.sb.size, 10) || 56)*0.9) : (parseInt(S.sb.size, 10) || 56), maxW = vert ? 940 : 1560;
+    const c = subRows.c || (subRows.c = document.createElement('canvas').getContext('2d'));
+    return text => { c.font = '700 '+size+'px "Segoe UI", Arial, sans-serif'; const sp = c.measureText(' ').width, ws = wordsOf(text); if(!ws.length) return 0;
+      let rows = 1, cw = 0; ws.forEach(w => { const m = c.measureText(w).width; if(cw && cw + sp + m > maxW){ rows++; cw = m; } else cw += (cw ? sp : 0) + m; }); return rows; };
+  }
+  async function preflight(kind){
+    const errs = [], warns = [], n = S.starts.length, ni = S.imgs.length, nl = S.lines.length;
+    if(!S.audioPath) errs.push('Нет озвучки: добавьте файл озвучки.');
+    else if(NATIVE && await NATIVE.gen.size(S.audioPath) <= 0) errs.push('Файл озвучки не найден ('+(S.audioName || baseName(S.audioPath))+'): его переместили или удалили. Добавьте озвучку заново.');
+    if(n < 2) errs.push('Видео не размечено: нажмите «Начать запись», «Разметить автоматически» или «Разметить по речи».');
+    if(n > ni) errs.push('Разметка рассчитана на '+n+' кадров, а картинок '+ni+'. Добавьте недостающие картинки.');
+    if(ni && nl && ni !== nl) warns.push('Картинок '+ni+', а строк текста '+nl+': часть кадров останется без текста или без картинки.');
+    if(NATIVE && n){
+      const uniq = [...new Set(S.imgs.slice(0, n).map(x => x.path).filter(Boolean))], size = {};
+      for(let k = 0; k < uniq.length; k += 24){ const part = uniq.slice(k, k+24), r = await Promise.all(part.map(p => NATIVE.gen.size(p))); part.forEach((p, j) => size[p] = r[j]); }
+      const bad = []; S.imgs.slice(0, n).forEach((x, i) => { if(!x.path || !(size[x.path] > 0)) bad.push(i+1); });
+      if(bad.length) errs.push('Не найдены картинки кадров '+ranges(bad)+': их переместили или удалили. Замените их в редакторе или добавьте картинки заново.');
+      if(S.mu && S.mu.path && await NATIVE.gen.size(S.mu.path) <= 0) errs.push('Фоновая музыка не найдена ('+(S.mu.name || baseName(S.mu.path))+'). Выберите трек заново или уберите его.');
+      const badS = []; for(const x of sfxList()) if(await NATIVE.gen.size(x.path) <= 0) badS.push(x.i+1);
+      if(badS.length) errs.push('Не найдены звуки на кадрах '+ranges(badS)+'. Поставьте их заново или уберите.');
+    }
+    if(n >= 2 && S.dur){
+      const lastStart = S.starts[n-1], d = durations(), short = [], long = [];
+      if(lastStart >= S.dur - 0.05) errs.push('Озвучка короче разметки: последний кадр начинается в '+fmt(lastStart)+', а звук длится '+fmt(S.dur)+'. Похоже, озвучку заменили: разметьте заново.');
+      d.forEach((x, i) => { if(i === n-1) return; if(x < 0.3) short.push(i+1); else if(x > 20) long.push(i+1); });
+      if(short.length) warns.push('Очень короткие кадры, меньше 0.3 с: '+ranges(short)+'. Их почти не будет видно.');
+      if(long.length) warns.push('Очень длинные кадры, больше 20 с: '+ranges(long)+'. Проверьте, не съехала ли разметка.');
+      if(S.dur - lastStart > 25) warns.push('Последний кадр висит '+Math.round(S.dur - lastStart)+' с до конца озвучки. Возможно, разметка закончилась раньше звука.');
+    }
+    if((S.sb.burn || kind === 'shorts') && nl && n){
+      const rows = subRows(kind === 'shorts'), longL = [], empty = [];
+      for(let i = 0; i < Math.min(n, nl); i++){ const r = rows(S.lines[i] || ''); if(!r) empty.push(i+1); else if(r > 2) longL.push(i+1); }
+      if(longL.length) warns.push('Субтитры не влезут в 2 строки на кадрах '+ranges(longL)+': там на экране будет 3 строки и больше.');
+      if(empty.length && empty.length < Math.min(n, nl)) warns.push('У кадров '+ranges(empty)+' нет текста: субтитров там не будет.');
+    }
+    if(kind === 'full' && S.ql && +S.ql.res >= 2160 && S.fx && S.fx.on) warns.push('4K с движением камеры собирается очень долго. Для YouTube хватает 1080p.');
+    return {errs, warns};
+  }
+  let pfResolve = null;
+  function pfDone(v){ $('pfModal').classList.remove('on'); const r = pfResolve; pfResolve = null; if(r) r(v); }
+  function pfShow(res, mode){
+    const box = $('pfList'); box.innerHTML = '';
+    const add = (c, t) => { const d = document.createElement('div'); d.className = 'pfi '+c; d.innerHTML = '<b></b><span></span>'; d.firstChild.textContent = c === 'err' ? 'Ошибка' : c === 'warn' ? 'Внимание' : 'Готово'; d.lastChild.textContent = t; box.appendChild(d); };
+    res.errs.forEach(t => add('err', t)); res.warns.forEach(t => add('warn', t));
+    if(!res.errs.length && !res.warns.length) add('ok', 'Всё в порядке: файлы на месте, разметка и звук совпадают. Можно собирать.');
+    $('pfSub').textContent = res.errs.length ? 'Видео не соберётся, пока есть ошибки. Исправьте их и попробуйте снова.' : res.warns.length ? 'Ошибок нет, но кое-что стоит проверить.' : '';
+    $('pfGo').style.display = mode === 'gate' && !res.errs.length ? '' : 'none';
+    $('pfFix').textContent = mode === 'gate' ? 'Вернуться и исправить' : 'Закрыть';
+    $('pfModal').classList.add('on');
+  }
+  async function preflightGate(kind){
+    let res; try{ res = await preflight(kind); }catch(e){ return true; }
+    if(kind === 'trial') res.warns = [];
+    if(!res.errs.length && !res.warns.length) return true;
+    if(pfResolve) pfDone(false);
+    return new Promise(r => { pfResolve = r; pfShow(res, 'gate'); });
+  }
+  $('pfGo').onclick = () => pfDone(true); $('pfFix').onclick = () => pfDone(false);
+  $('pfOpen').onclick = async () => { $('pfOpen').disabled = true; try{ pfShow(await preflight('full'), 'info'); }finally{ $('pfOpen').disabled = false; } };
+
+  /* ---- wiring of the new buttons ---- */
+  $('edSfx').onclick = openSfx; $('edChap').onclick = openChap;
+  $('thOpen').onclick = openThumb; $('chOpen').onclick = openChapters;
+  if(NATIVE){
+    if(NATIVE.gen){ $('edRegen').style.display = ''; $('edRegen').onclick = openRegen; }
+    $('rgGo').onclick = rgGo;
+    $('rgStop').onclick = () => { G.tok++; RG.busy = false; G.run = false; $('rgGo').disabled = false; $('rgStop').style.display = 'none'; rgMsg('Остановлено.'); };
+    $('rgLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:GEN.url}); rgMsg(r.ok ? 'Окно Gemini открывается. Войдите в Google, если нужно, и нажмите «Сгенерировать».' : 'Ошибка: '+r.error); };
+    $('rgClose').onclick = () => closeModal($('rgModal'));
+    $('bkOpen').style.display = '';
+    $('bkOpen').onclick = () => { if(!V4){ toast('Для резервных копий нужна новая версия программы: скачайте и установите свежий AutoCut-Setup.exe'); return; } if(activeId) saveProject(activeId); $('bkWrap').style.display = 'none'; bkMsg(''); $('bkModal').classList.add('on'); };
   }
 
   /* ---------- rebindable keys ---------- */
@@ -2087,6 +2982,14 @@ const AutoAlign = (function(){
     // boundary handles
     c.fillStyle = acc2;
     for(let i=1;i<n;i++){ const x = xOf(S.starts[i]); if(x < -4) continue; if(x > W+4) break; c.fillRect(Math.round(x)-1, RUL, 2, H-RUL); }
+    // chapters (flag in the ruler) and scene sounds (note near the bottom)
+    for(let i=f0;i<n;i++){
+      const m = S.meta[i]; if(!m) continue; const a = xOf(S.starts[i]); if(a > W) break;
+      if(m.chap){ const ok = cssv('--ok'); c.fillStyle = ok; c.fillRect(Math.round(a), RUL, 2, H-RUL); c.beginPath(); c.moveTo(a+2, RUL+1); c.lineTo(a+10, RUL+5); c.lineTo(a+2, RUL+9); c.closePath(); c.fill();
+        const b = xOf(i<n-1 ? S.starts[i+1] : S.dur), x0 = Math.max(a, 0) + 8 + c.measureText(String(i+1)).width + 8, room = Math.min(b, W) - x0 - 4;
+        if(room > 30){ c.save(); c.beginPath(); c.rect(x0, RUL, room, 16); c.clip(); c.fillStyle = ok; c.font = '600 11px system-ui,sans-serif'; c.fillText(m.chap, x0, RUL+3); c.restore(); } }
+      if(m.sfx){ const sx = xOf(S.starts[i] + (+m.sfx.off||0)); c.fillStyle = acc2; c.beginPath(); c.arc(sx, H-11, 6, 0, Math.PI*2); c.fill(); c.fillStyle = bg; c.font = 'bold 9px system-ui,sans-serif'; c.fillText('♪', sx-3, H-16); c.font = '11px system-ui,sans-serif'; }
+    }
     // playhead
     const px = xOf(nowT()); if(px >= -6 && px <= W+6){ c.fillStyle = acc; c.fillRect(Math.round(px)-1, 0, 2, H); c.beginPath(); c.moveTo(px-6,0); c.lineTo(px+6,0); c.lineTo(px,9); c.closePath(); c.fill(); }
     edDirty = false;
@@ -2097,14 +3000,16 @@ const AutoAlign = (function(){
     const tx = $('edTxt'); if(document.activeElement !== tx && tx.dataset.i !== String(i)+'|'+(S.lines[i]||'')){ tx.value = S.lines[i] || ''; tx.dataset.i = String(i)+'|'+(S.lines[i]||''); }
     $('edUndo').disabled = !ED.undo.length; $('edRedo').disabled = !ED.redo.length;
     $('edDel').disabled = n <= 2; $('edSplit').disabled = !canSplit(i);
+    if(typeof edMetaInfo==='function') edMetaInfo(i);
     document.querySelectorAll('[data-nl],#edLNow,#edLPlay').forEach(b => b.disabled = i===0);
     document.querySelectorAll('[data-nr],#edRNow,#edRPlay').forEach(b => b.disabled = i>=n-1);
     const sc = $('tlScroll'), span = ED.w/ED.pps, rng = Math.max(0.001, S.dur - span);
     if(document.activeElement !== sc) sc.value = Math.round(Math.min(1, ED.view/rng)*1000);
   }
-  const snap = () => ({starts:S.starts.slice(), imgs:S.imgs.slice(), lines:S.lines.slice(), idx:S.idx});
+  const cloneMeta = a => (a||[]).map(x => x ? JSON.parse(JSON.stringify(x)) : null);
+  const snap = () => ({starts:S.starts.slice(), imgs:S.imgs.slice(), lines:S.lines.slice(), meta:cloneMeta(S.meta), idx:S.idx});
   function pushUndo(sn){ ED.undo.push(sn || snap()); if(ED.undo.length > 80) ED.undo.shift(); ED.redo.length = 0; }
-  function restore(sn){ S.starts = sn.starts.slice(); S.imgs = sn.imgs.slice(); S.lines = sn.lines.slice(); computeWeights(); S.rendered = false; afterEdit(); }
+  function restore(sn){ S.starts = sn.starts.slice(); S.imgs = sn.imgs.slice(); S.lines = sn.lines.slice(); S.meta = cloneMeta(sn.meta); computeWeights(); S.rendered = false; afterEdit(); }
   function undo(){ if(!ED.undo.length) return; ED.redo.push(snap()); restore(ED.undo.pop()); }
   function redo(){ if(!ED.redo.length) return; ED.undo.push(snap()); restore(ED.redo.pop()); }
   function afterEdit(){ S.rendered = false; lastShown = -1; edDirty = true; touch(); refresh(); syncEditor(); }
@@ -2135,14 +3040,15 @@ const AutoAlign = (function(){
   function splitHere(){
     const i = curI(); if(!canSplit(i)) { toast('Поставьте курсор внутрь кадра, не у самой границы'); return; }
     fillLines(); pushUndo();
-    S.starts.splice(i+1, 0, nowT()); S.imgs.splice(i+1, 0, Object.assign({}, S.imgs[i])); S.lines.splice(i+1, 0, '');
+    S.starts.splice(i+1, 0, nowT()); S.imgs.splice(i+1, 0, Object.assign({}, S.imgs[i])); S.lines.splice(i+1, 0, ''); if(S.meta.length > i+1) S.meta.splice(i+1, 0, null);
     computeWeights(); afterEdit(); toast('Кадр разрезан. Новый кадр использует ту же картинку');
   }
   function deleteFrame(){
     const n = S.starts.length, i = curI(); if(n <= 2) return;
     if(!confirm('Удалить кадр '+(i+1)+'? Его время отойдёт соседнему кадру, картинка уйдёт из проекта.')) return;
     fillLines(); pushUndo();
-    S.starts.splice(i,1); S.imgs.splice(i,1); S.lines.splice(i,1); S.starts[0] = 0;
+    const dm = S.meta[i]; S.starts.splice(i,1); S.imgs.splice(i,1); S.lines.splice(i,1); S.meta.splice(i,1); S.starts[0] = 0;
+    if(dm && dm.chap && i < S.starts.length && !(S.meta[i] && S.meta[i].chap)) setMeta(i, 'chap', dm.chap);
     computeWeights(); afterEdit(); toast('Кадр удалён');
   }
   $('edImg').onclick = () => $('edImgFile').click();
@@ -2235,7 +3141,9 @@ const AutoAlign = (function(){
     if(tag==='select' && e.code==='Space') return;
     if(tag==='textarea' || (tag==='input' && e.target.type==='text')) return;
     if($('resume').classList.contains('on')) return;
+    if($('pfModal').classList.contains('on')){ if(e.key==='Escape') closeModal($('pfModal')); return; }
     if($('modal').classList.contains('on')){ if(e.key==='Escape') $('modal').classList.remove('on'); return; }
+    { const open = [...document.querySelectorAll('.modal.on')]; if(open.length){ if(e.key==='Escape') closeModal(open[open.length-1]); return; } }
     if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code==='KeyZ' && edOn()){ e.preventDefault(); undo(); return; }
     if((e.ctrlKey || e.metaKey) && (e.code==='KeyY' || (e.shiftKey && e.code==='KeyZ')) && edOn()){ e.preventDefault(); redo(); return; }
     if(e.altKey && edOn() && (e.code==='ArrowLeft' || e.code==='ArrowRight')){ e.preventDefault(); nudge('l', e.code==='ArrowLeft' ? -0.1 : 0.1); return; }
