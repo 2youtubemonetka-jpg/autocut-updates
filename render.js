@@ -80,6 +80,31 @@ function fxEndFilter(kind, zmax) {        // how a picture with this effect look
   return FIT + ',scale=' + ZW() + ':' + ZH() + ':flags=lanczos,' + zpExpr(kind, 2, zmax, true) + ',format=yuva420p';
 }
 
+// video card encoding: NVIDIA NVENC is used only when a short test encode works on this computer
+let hwCache = null;
+function hwUsable(bin) {
+  if (process.env.AUTOCUT_FORCE_HW) return Promise.resolve(true);      // test hook: pretend the card works
+  if (hwCache) return hwCache;
+  hwCache = new Promise(resolve => {
+    try {
+      const c = spawn(bin, ['-hide_banner', '-nostats', '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:d=0.4:r=30', '-c:v', 'h264_nvenc', '-f', 'null', '-'], { windowsHide: true });
+      const to = setTimeout(() => { try { c.kill(); } catch (_) {} resolve(false); }, 20000);
+      c.on('error', () => { clearTimeout(to); resolve(false); });
+      c.on('close', code => { clearTimeout(to); resolve(code === 0); });
+      c.stderr.on('data', () => {});
+    } catch (_) { resolve(false); }
+  });
+  return hwCache;
+}
+function encArgs(hw, quality) {
+  if (hw) {
+    const cq = { fast: '28', normal: '23', high: '19' }[quality] || '23', pr = { fast: 'p3', normal: 'p4', high: 'p6' }[quality] || 'p4';
+    return ['-c:v', 'h264_nvenc', '-preset', pr, '-rc', 'vbr', '-cq', cq, '-b:v', '0', '-bf', '0', '-pix_fmt', 'yuv420p'];
+  }
+  const Q = { fast: ['veryfast', '24'], normal: ['veryfast', '20'], high: ['medium', '16'] }[quality] || ['veryfast', '20'];
+  return ['-c:v', 'libx264', '-preset', Q[0], '-crf', Q[1], '-pix_fmt', 'yuv420p'];
+}
+
 function runFf(bin, args, onErr, reg) {
   return new Promise((resolve, reject) => {
     const c = spawn(bin, args, { windowsHide: true });
@@ -192,7 +217,8 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
   setGeom(GEO[0], GEO[1]);
   const Q = { fast: ['veryfast', '24'], normal: ['veryfast', '20'], high: ['medium', '16'] }[opts.quality] || ['veryfast', '20'];
   const kids = new Set();
-  let cancelled = false, tail = '';
+  let cancelled = false, tail = '', encoderUsed = 'cpu (still images, one pass)', encoderNote = '';
+  const tStart = Date.now();
   const reg = c => { kids.add(c); c.on('close', () => kids.delete(c)); };
   const promise = (async () => {
     if (onProgress) onProgress(0);
@@ -254,8 +280,9 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
           lines.push("file '" + esc(blank) + "'");
           const lf = path.join(tmpRoot, 'sub' + i + '.txt'); fs.writeFileSync(lf, lines.join('\n') + '\n', 'utf8'); return lf;
         });
+        const runClips = async (hw) => {
         let done = 0, next = 0;
-        const workers = Math.max(1, Math.min(4, (os.cpus() || []).length - 1 || 1));
+        const workers = hw ? 3 : Math.max(1, Math.min(4, (os.cpus() || []).length - 1 || 1));
         const worker = async () => {
           while (next < fr.length && !cancelled) {
             const i = next++, f = fr[i], N = counts[i];
@@ -300,12 +327,20 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
             if (i === 0 && fadeIn > 0) tailChain += ',fade=t=in:st=0:d=' + Math.min(fadeIn, N / FPS).toFixed(2);
             if (i === fr.length - 1 && fadeOutV > 0) { const d = Math.min(fadeOutV, N / FPS); tailChain += ',fade=t=out:st=' + (N / FPS - d).toFixed(3) + ':d=' + d.toFixed(2); }
             g.push('[' + cur + ']' + tailChain + '[vout]');
-            args.push('-filter_complex', g.join(';'), '-map', '[vout]', '-c:v', 'libx264', '-preset', Q[0], '-crf', Q[1], '-pix_fmt', 'yuv420p', '-r', String(FPS), '-an', '-frames:v', String(N), clips[i]);
+            args.push('-filter_complex', g.join(';'), '-map', '[vout]', ...encArgs(hw, opts.quality), '-r', String(FPS), '-an', '-frames:v', String(N), clips[i]);
             await runFf(bin, args, null, reg);
             done++; if (onProgress) onProgress(0.92 * done / fr.length);
           }
         };
         await Promise.all(Array.from({ length: workers }, worker));
+        };
+        let hwUse = opts.hw !== 'off' && await hwUsable(bin);
+        if (cancelled) throw new Error('cancelled');
+        if (hwUse) {
+          try { await runClips(true); encoderUsed = 'nvenc'; }
+          catch (e) { if (cancelled) throw e; hwUse = false; encoderNote = ' (video card failed, redone on the processor: ' + String(e.message || e).split('\n')[0].slice(0, 120) + ')'; }
+        }
+        if (!hwUse) { await runClips(false); encoderUsed = 'cpu'; }
         if (cancelled) throw new Error('cancelled');
         const list = path.join(tmpRoot, 'clips.txt');
         fs.writeFileSync(list, clips.map(c => "file '" + esc(c) + "'").join('\n') + '\n', 'utf8');
@@ -319,6 +354,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
       }
       if (cancelled) throw new Error('cancelled');
       if (onProgress) onProgress(1);
+      try { fs.appendFileSync(outPath.replace(/\.[^.\\/]+$/, '') + '_log.txt', 'encoder=' + encoderUsed + encoderNote + ' seconds=' + ((Date.now() - tStart) / 1000).toFixed(1) + '\n', 'utf8'); } catch (_) {}
       return outPath;
     } catch (e) {
       if (cancelled) throw new Error('cancelled');

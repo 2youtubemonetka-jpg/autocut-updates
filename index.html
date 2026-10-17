@@ -305,6 +305,7 @@
       <div class="stat" id="stT"><b>0</b><small>строк</small></div>
       <div class="stat" id="stA"><b>0:00</b><small>звук</small></div>
     </div>
+    <button class="btn" id="gapOpen" style="display:none;width:100%;margin:0 0 8px">Найти пропущенные картинки</button>
     <div class="msg" id="msg"></div>
 
     <div class="sec">
@@ -377,6 +378,9 @@
           <select id="qRes"><option value="720">720p (HD)</option><option value="1080">1080p (Full HD)</option><option value="1440">1440p (2K)</option><option value="2160">2160p (4K)</option></select></div>
         <div class="row"><span>Качество</span>
           <select id="qQual"><option value="fast">Быстро, меньше размер</option><option value="normal">Обычное</option><option value="high">Высокое, дольше</option></select></div>
+        <div class="row" id="qHwRow" style="display:none"><span>Кодирование</span>
+          <select id="qHw"><option value="auto">Видеокартой NVIDIA, если есть</option><option value="off">Процессором</option></select></div>
+        <div class="hint" id="qHwInfo" style="margin:0;display:none"></div>
         <div class="hint" style="margin:0">Чем выше разрешение и качество, тем дольше сборка и больше файл. Для YouTube хватает 1080p.</div>
       </div>
     </div>
@@ -523,6 +527,7 @@
       <div class="chips" id="libChips"></div>
       <span style="flex:1"></span>
       <select id="libCh"></select>
+      <button class="btn" id="calOpen">Календарь выходов</button>
       <button class="btn primary" id="libNew">+ Новый проект</button>
     </div>
     <div class="libgrid" id="libGrid"></div>
@@ -702,6 +707,27 @@
   <div id="obBody"></div>
   <div class="btns"><button class="btn" id="obBack">Назад</button><button class="btn primary" id="obNext">Дальше</button><button class="btn" id="obClose">Закрыть</button></div>
 </div></div>
+<div class="modal" id="calModal"><div class="card wide">
+  <h2>Календарь выходов</h2>
+  <div class="hint" id="calNudge" style="margin:0 0 8px"></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><button class="btn" id="calPrev">&lt;</button><b id="calTitle" style="min-width:140px;text-align:center"></b><button class="btn" id="calNext">&gt;</button><button class="btn" id="calToday">Сегодня</button></div>
+  <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+  <h3 style="margin:14px 0 6px;font-size:14px">Все проекты</h3>
+  <div id="calList" style="max-height:26vh;overflow:auto;display:grid;gap:6px"></div>
+  <div class="btns"><button class="btn" id="calClose">Закрыть</button></div>
+</div></div>
+<div class="modal" id="gapModal"><div class="card mid">
+  <h2>Пропущенные картинки</h2>
+  <p class="hint" id="gapSub" style="margin:0 0 8px"></p>
+  <div id="gapList" style="max-height:40vh;overflow:auto;display:grid;gap:6px;margin-bottom:10px"></div>
+  <div class="hint" id="gapMsg" style="margin:0 0 8px"></div>
+  <div class="btns" style="flex-wrap:wrap">
+    <button class="btn primary" id="gapGen">Сгенерировать недостающие в Gemini</button>
+    <button class="btn" id="gapCopy">Скопировать промты недостающих</button>
+    <button class="btn" id="gapApply">Применить выбранные файлы</button>
+    <button class="btn" id="gapClose">Закрыть</button>
+  </div>
+</div></div>
 <div class="modal" id="shModal"><div class="card mid">
   <h2>Shorts 9:16</h2>
   <p class="hint">Вертикальное видео 1080x1920 из этого же проекта: картинка по центру на размытом фоне, субтитры по центру.</p>
@@ -800,7 +826,7 @@
   const SBD = () => ({burn:false, srt:false, hl:true, size:'56', mode:'line', col:'red', caps:false});
   const FLD = () => ({on:false, grain:'1', vig:'1', shake:'0', tone:'none', flash:false});
   const AUD = () => ({norm:false});
-  const QD = () => ({res:'1080', q:'normal'});
+  const QD = () => ({res:'1080', q:'normal', hw:'auto'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
   const GND = () => ({text:'', dir:'', key:'', manual:{}});
   const newState = () => ({lang:'', fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), film:FLD(), au:AUD(), gen:GND(), meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
@@ -886,15 +912,15 @@
   function renderPost(){
     const t = S.tr, b = S.sb, m = S.mu;
     $('trOn').checked = !!t.on; $('tropts').classList.toggle('off', !t.on); $('trEvery').value = t.every; $('trDur').value = t.dur;
-    const q = S.ql || (S.ql = QD()); $('qRes').value = q.res; $('qQual').value = q.q;
+    const q = S.ql || (S.ql = QD()); $('qRes').value = q.res; $('qQual').value = q.q; $('qHw').value = q.hw || 'auto';
     $('trIn').checked = !!t.fin; $('trOut').checked = !!t.fout;
     $('sbBurn').checked = !!b.burn; $('sbopts').classList.toggle('off', !b.burn); $('sbHl').checked = !!b.hl; $('sbSize').value = b.size; $('sbSrt').checked = !!b.srt; $('sbMode').value = b.mode || 'line'; $('sbCol').value = b.col || 'red'; $('sbCaps').checked = !!b.caps; $('sbMode').disabled = !b.hl; if(typeof sbInfoUpd==='function') sbInfoUpd();
     $('muName').textContent = m.name || 'Трек не выбран'; $('muDel').style.display = m.path ? '' : 'none';
-    const fl = S.film || (S.film = FLD()); $('fiOn').checked = !!fl.on; $('fiopts').classList.toggle('off', !fl.on); $('fiGrain').value = fl.grain; $('fiVig').value = fl.vig; $('fiShake').value = fl.shake; $('fiTone').value = fl.tone; $('fiFlash').checked = !!fl.flash; $('stage').classList.toggle('film-vig', !!fl.on && +fl.vig > 0); $('auNorm').checked = !!(S.au && S.au.norm); if(typeof renderLang==='function') renderLang();
+    const fl = S.film || (S.film = FLD()); $('fiOn').checked = !!fl.on; $('fiopts').classList.toggle('off', !fl.on); $('fiGrain').value = fl.grain; $('fiVig').value = fl.vig; $('fiShake').value = fl.shake; $('fiTone').value = fl.tone; $('fiFlash').checked = !!fl.flash; $('stage').classList.toggle('film-vig', !!fl.on && +fl.vig > 0); $('auNorm').checked = !!(S.au && S.au.norm); if(typeof renderLang==='function') renderLang(); if(typeof hwInfoUpd==='function') hwInfoUpd();
     $('muopts').classList.toggle('off', !m.path); $('muVol').value = m.vol; $('muDuck').value = m.duck; $('muFade').value = m.fade;
   }
   const bind = (id, fn) => { $(id).onchange = e => { fn(e.target); touch(); }; };
-  bind('qRes', e => (S.ql||(S.ql=QD())).res = e.value); bind('qQual', e => (S.ql||(S.ql=QD())).q = e.value);
+  bind('qHw', e => { (S.ql||(S.ql=QD())).hw = e.value; if(typeof hwInfoUpd==='function') hwInfoUpd(); }); bind('qRes', e => (S.ql||(S.ql=QD())).res = e.value); bind('qQual', e => (S.ql||(S.ql=QD())).q = e.value);
   bind('trOn', e => { S.tr.on = e.checked; renderPost(); });
   bind('trEvery', e => S.tr.every = e.value); bind('trDur', e => S.tr.dur = e.value);
   bind('trIn', e => S.tr.fin = e.checked); bind('trOut', e => S.tr.fout = e.checked);
@@ -980,7 +1006,7 @@
     xo = xo || {}; const vert = !!xo.vertical;
     const d = durations(); computeWeights();
     const frames = S.starts.map((s,i)=>({path:S.imgs[i].path, duration:d[i], fx:fxFor(i), zoom:fxZoom(), tr:trFor(i), text:S.lines[i]||''}));
-    const opts = {srt:!!S.sb.srt && !range && !vert, burn:!!S.sb.burn || vert, vertical:vert, height:+((S.ql||QD()).res)||1080, quality:(S.ql||QD()).q, fadeIn:S.tr.fin?0.8:0, fadeOut:S.tr.fout?1.2:0};
+    const opts = {srt:!!S.sb.srt && !range && !vert, burn:!!S.sb.burn || vert, vertical:vert, height:+((S.ql||QD()).res)||1080, quality:(S.ql||QD()).q, hw:(S.ql||QD()).hw||'auto', fadeIn:S.tr.fin?0.8:0, fadeOut:S.tr.fout?1.2:0};
     if(S.mu.path) opts.music = {path:S.mu.path, vol:(S.mu.vol||20)/100, duck:+S.mu.duck, fade:+S.mu.fade};
     if(S.sb.burn || vert){
       let strip = 0;
@@ -1158,8 +1184,8 @@
     const imgs = [], miss = [];
     for(let n = 1; n <= total; n++){
       const man = S.gen.manual && S.gen.manual[n];
-      if(have.has(n)){ const pth = dir+G.sep+imgName(n); imgs.push({name:imgName(n), path:pth, url:fileUrl(pth)}); }
-      else if(man){ const nm = String(man).split(/[\\/]/).pop(); imgs.push({name:nm, path:man, url:fileUrl(man)}); }
+      if(have.has(n)){ const pth = dir+G.sep+imgName(n); imgs.push({name:imgName(n), path:pth, url:fileUrl(pth), n}); }
+      else if(man){ const nm = String(man).split(/[\\/]/).pop(); imgs.push({name:nm, path:man, url:fileUrl(man), n}); }
       else miss.push(n);
     }
     if(!imgs.length){ toast('Пока нет готовых картинок'); return; }
@@ -1311,7 +1337,7 @@
   function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2800); }
 
   function serialize(st){
-    return {lang:st.lang||'', imgs:st.imgs.map(i => ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
+    return {lang:st.lang||'', imgs:st.imgs.map(i => i.n != null ? ({name:i.name, path:i.path||'', n:i.n}) : ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
             pos:st.pos||0, rendered:!!st.rendered, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, film:st.film, au:st.au, tight:st.tight||null, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}, meta:st.meta||[], thumb:st.thumb||null, desc:st.desc||'', preset:st.preset||''};
   }
@@ -1338,7 +1364,7 @@
     st.lang = d.lang || ''; st.meta = Array.isArray(d.meta) ? d.meta : []; st.thumb = d.thumb || null; st.desc = d.desc || ''; st.preset = d.preset || '';
     st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = Object.assign(FLD(), d.film || {}); st.au = Object.assign(AUD(), d.au || {}); st.tight = d.tight || null; st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
     if(NATIVE){
-      st.imgs = (d.imgs||[]).filter(i => i.path).map(i => ({name:i.name, path:i.path, url:fileUrl(i.path)}));
+      st.imgs = (d.imgs||[]).filter(i => i.path).map(i => i.n != null ? ({name:i.name, path:i.path, url:fileUrl(i.path), n:i.n}) : ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
       st.dur = d.dur || 0;
       if(st.imgs.length && st.imgs.length === (d.imgs||[]).length){
@@ -1502,7 +1528,7 @@
       const s1 = document.createElement('small'); s1.textContent = (c.name||'Канал')+' · '+new Date(t.updated||Date.now()).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
       const s2 = document.createElement('small'); s2.textContent = st.line;
       const bar = document.createElement('div'); bar.className = 'pbar'; bar.innerHTML = '<i style="width:'+Math.round(st.pct*100)+'%"></i>';
-      body.append(nm, s1, s2, bar);
+      const s3 = document.createElement('small'); s3.textContent = planLabel(t); s3.style.color = 'var(--accent)'; body.append(nm, s1, s2, s3, bar);
       const act = document.createElement('div'); act.className = 'pact';
       const open = document.createElement('button'); open.className = 'btn primary'; open.textContent = t.parked ? 'Вернуть в работу' : (st.grp==='done' ? 'Открыть' : 'Продолжить');
       open.onclick = () => { setView('work'); switchTab(t.id); };
@@ -1621,9 +1647,10 @@
     $('stI').classList.toggle('bad', ni && nt && ni!==nt);
     $('stT').classList.toggle('bad', ni && nt && ni!==nt);
     let m = '';
-    if(ni && nt && ni!==nt) m = 'Картинок '+ni+', строк '+nt+'. Количество не совпадает — лишнее останется без текста/картинки.';
+    if(ni && nt && ni!==nt) m = 'Картинок '+ni+', строк '+nt+'. Количество не совпадает: лишнее останется без текста/картинки. Кнопка «Найти пропущенные картинки» покажет, каких номеров не хватает.';
     if(S.missing) m = 'Сохранённые файлы не найдены (перемещены или удалены). Добавьте их заново: тайминги сохранены.';
     $('msg').textContent = m;
+    if(typeof gapBtnUpd==='function') gapBtnUpd();
     updStart();
     if(S.mode==='idle') showFrame(0,true);
   }
@@ -1829,10 +1856,10 @@
       $('rbar').style.width='0'; $('rtxt').textContent = 'Собираю видео… 0%';
       const nTr = frames.filter(f=>f.tr>0).length, nSb = frames.filter(f=>f.subs&&f.subs.length).length, nFx = frames.filter(f=>f.fx).length;
       const sum = ' (переходов: '+nTr+', кадров с субтитрами: '+nSb+', кадров с движением: '+nFx+')';
-      $('eRender').disabled = true; $('eTrial').disabled = true;
+      $('eRender').disabled = true; $('eTrial').disabled = true; const t0r = Date.now();
       const r = await NATIVE.render({frames, audioPath:S.audioPath});
       $('eRender').disabled = false; $('eTrial').disabled = false;
-      if(r.ok){ $('rtxt').textContent = 'Готово: '+r.out+sum; NATIVE.showItem(r.out); if(!range){ S.rendered = true; if(activeId) saveProject(activeId); } }
+      if(r.ok){ const sec = Math.round((Date.now()-t0r)/1000); $('rtxt').textContent = 'Готово за '+Math.floor(sec/60)+' мин '+String(sec%60).padStart(2,'0')+' с: '+r.out+sum; NATIVE.showItem(r.out); if(!range){ S.rendered = true; if(activeId) saveProject(activeId); } }
       else if(r.cancelled){ $('rwrap').style.display='none'; }
       else { $('rtxt').textContent = r.error==='cancelled' ? 'Отменено' : 'Ошибка: '+r.error; }
     };
@@ -2671,7 +2698,7 @@
       map.set(p, nm); jobs.push([p, nm]); return nm;
     };
     const out = JSON.parse(JSON.stringify(d));
-    out.imgs = (d.imgs || []).map(i => ({name:i.name, path:take(i.path, 'img')}));
+    out.imgs = (d.imgs || []).map(i => i.n != null ? ({name:i.name, path:take(i.path, 'img'), n:i.n}) : ({name:i.name, path:take(i.path, 'img')}));
     out.audioPath = take(d.audioPath, 'voice');
     if(out.tight && d.tight && d.tight.path) out.tight.path = take(d.tight.path, 'file');
     if(out.mu) out.mu.path = take(d.mu && d.mu.path, 'music');
@@ -2729,7 +2756,7 @@
     let pid = '';
     if(doc.preset && doc.preset.name){ let p = presets().find(x => x.name === doc.preset.name); if(!p){ p = {id:uid(), name:doc.preset.name, data:doc.preset.data}; presets().push(p); } pid = p.id; if(fresh) c.preset = p.id; }
     const abs = r => r ? joinP(dir, r) : '', st = JSON.parse(JSON.stringify(doc.state));
-    st.imgs = (st.imgs || []).map(i => ({name:i.name, path:abs(i.path)}));
+    st.imgs = (st.imgs || []).map(i => i.n != null ? ({name:i.name, path:abs(i.path), n:i.n}) : ({name:i.name, path:abs(i.path)}));
     st.audioPath = abs(st.audioPath); if(st.mu) st.mu.path = abs(st.mu.path); if(st.tight && st.tight.path) st.tight.path = abs(st.tight.path);
     st.meta = (st.meta || []).map(m => { if(m && m.sfx && m.sfx.path) m.sfx.path = abs(m.sfx.path); if(m && m.orig) m.orig = abs(m.orig); return m; });
     if(st.gen){ Object.keys(st.gen.manual || {}).forEach(k => st.gen.manual[k] = abs(st.gen.manual[k])); st.gen.dir = ''; st.gen.key = ''; }
@@ -3184,7 +3211,7 @@ const AutoAlign = (function(){
   function splitHere(){
     const i = curI(); if(!canSplit(i)) { toast('Поставьте курсор внутрь кадра, не у самой границы'); return; }
     fillLines(); pushUndo();
-    S.starts.splice(i+1, 0, nowT()); S.imgs.splice(i+1, 0, Object.assign({}, S.imgs[i])); S.lines.splice(i+1, 0, ''); if(S.meta.length > i+1) S.meta.splice(i+1, 0, null);
+    S.starts.splice(i+1, 0, nowT()); S.imgs.splice(i+1, 0, Object.assign({}, S.imgs[i], {n:undefined})); S.lines.splice(i+1, 0, ''); if(S.meta.length > i+1) S.meta.splice(i+1, 0, null);
     computeWeights(); afterEdit(); toast('Кадр разрезан. Новый кадр использует ту же картинку');
   }
   function deleteFrame(){
@@ -3563,6 +3590,159 @@ const AutoAlign = (function(){
   $('langSel').onchange = e => { S.lang = e.target.value; try{ const c = curCh(); if(c) c.lang = S.lang; save(); }catch(err){} renderLang(); touch(); };
   $('asrqSel').onchange = e => { try{ localStorage.setItem('autocut.asrq', e.target.value); }catch(err){} renderLang(); };
   renderLang();
+
+
+  /* ====================== v6: video card (NVIDIA) check ====================== */
+  const HW = {state:'', busy:false};
+  async function hwCheck(){
+    if(!NATIVE || HW.busy || HW.state) return HW.state;
+    HW.busy = true;
+    try{ const r = await NATIVE.tool.run({exe:'ffmpeg', args:['-hide_banner', '-nostats', '-f', 'lavfi', '-i', 'color=c=black:s=1280x720:d=0.4:r=30', '-c:v', 'h264_nvenc', '-f', 'null', '-'], timeout:25000}); HW.state = r.ok ? 'yes' : 'no'; }catch(e){ HW.state = 'no'; }
+    HW.busy = false; hwInfoUpd(); return HW.state;
+  }
+  function hwInfoUpd(){
+    if(!NATIVE) return; $('qHwRow').style.display = ''; const el = $('qHwInfo'); el.style.display = '';
+    const off = ((S.ql || {}).hw) === 'off';
+    el.textContent = off ? 'Сборка идёт на процессоре.' : HW.state === 'yes' ? 'Видеокарта NVIDIA найдена: сборка пойдёт быстрее, если что-то не получится, программа сама соберёт процессором.' : HW.state === 'no' ? 'Видеокарта NVIDIA не найдена или не подходит: сборка идёт на процессоре.' : 'Проверяю видеокарту…';
+  }
+  if(NATIVE){ hwInfoUpd(); setTimeout(hwCheck, 1500); }
+
+
+  /* ====================== v6: missing pictures ====================== */
+  const imgNum = i => (i && i.n != null) ? i.n : numKey((i && i.name) || '');
+  function gapInfo(){
+    const N = S.lines.length || parsePrompts(S.gen.text || '').length; if(!N || !S.imgs.length) return null;
+    const nums = S.imgs.map(imgNum), have = new Set(nums.filter(x => isFinite(x))), miss = [];
+    for(let n = 1; n <= N; n++) if(!have.has(n)) miss.push(n);
+    return {N, miss, have, nonum:nums.filter(x => !isFinite(x)).length, dup:nums.filter(isFinite).length - have.size, extra:[...have].filter(n => n > N).length};
+  }
+  function gapBtnUpd(){
+    const g = gapInfo(), b = $('gapOpen'); if(!b) return;
+    const show = !!g && (g.miss.length > 0 || g.nonum > 0 || g.dup > 0); b.style.display = show ? '' : 'none';
+    if(show) b.textContent = g.miss.length ? 'Найти пропущенные картинки ('+g.miss.length+')' : 'Проверить нумерацию картинок';
+  }
+  const GAP = {pick:{}};
+  function gapPrompt(n){ const pr = parsePrompts(S.gen.text || ''); return pr.length === (S.lines.length || pr.length) ? (pr[n-1] || '') : ''; }
+  function gapRender(){
+    const g = gapInfo(); if(!g){ $('gapModal').classList.remove('on'); return; }
+    const parts = ['Строк текста: '+g.N+'. Картинок: '+S.imgs.length+'.'];
+    parts.push(g.miss.length ? 'Не хватает номеров ('+g.miss.length+'): '+ranges(g.miss)+'.' : 'Все номера от 1 до '+g.N+' на месте.');
+    if(g.dup) parts.push('Повторяющихся номеров: '+g.dup+'.'); if(g.nonum) parts.push('Файлов без номера в названии: '+g.nonum+'.'); if(g.extra) parts.push('Номеров больше '+g.N+': '+g.extra+'.');
+    $('gapSub').textContent = parts.join(' ');
+    const box = $('gapList'); box.innerHTML = '';
+    g.miss.slice(0, 60).forEach(n => {
+      const row = document.createElement('div'); row.className = 'row'; row.style.cssText = 'gap:6px;align-items:flex-start';
+      const t = document.createElement('div'); t.style.cssText = 'flex:1;font-size:13px;min-width:0'; const line = S.lines[n-1] || gapPrompt(n) || '';
+      t.innerHTML = '<b></b> <span style="color:var(--dim)"></span>'; t.firstChild.textContent = 'image_'+n; t.lastChild.textContent = ' '+line.slice(0, 100)+(line.length > 100 ? '…' : '');
+      const lb = document.createElement('label'); lb.className = 'btn'; lb.style.cssText = 'width:auto;margin:0;padding:5px 9px;font-size:12px;cursor:pointer;white-space:nowrap';
+      lb.textContent = GAP.pick[n] ? 'Выбрано: '+baseName(GAP.pick[n]).slice(0, 18) : 'Выбрать файл';
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+      inp.onchange = () => { const f = inp.files[0]; if(!f) return; const pth = NATIVE ? NATIVE.pathFor(f) : ''; if(!pth){ toast('Не удалось получить путь к файлу'); return; } GAP.pick[n] = pth; gapRender(); };
+      lb.appendChild(inp); row.append(t, lb); box.appendChild(row);
+    });
+    if(g.miss.length > 60){ const more = document.createElement('div'); more.className = 'hint'; more.style.margin = '0'; more.textContent = 'Показаны первые 60 из '+g.miss.length+'.'; box.appendChild(more); }
+    const prompts = parsePrompts(S.gen.text || '');
+    $('gapMsg').textContent = !g.miss.length ? '' : !prompts.length ? 'Промтов в проекте нет: откройте «Сгенерировать картинки (Gemini)» и вставьте их, чтобы заказать недостающие.' : prompts.length !== g.N ? 'Промтов '+prompts.length+', а строк текста '+g.N+'. Проверьте, что это промты именно к этому ролику.' : 'Промты на месте: можно заказать недостающие в Gemini.';
+    $('gapGen').style.display = NATIVE && NATIVE.gen ? '' : 'none'; $('gapGen').disabled = !g.miss.length;
+    $('gapCopy').disabled = !g.miss.length || !prompts.length; $('gapApply').disabled = !Object.keys(GAP.pick).length;
+  }
+  function gapSeedManual(){ S.imgs.forEach(i => { const n = imgNum(i); if(isFinite(n) && i.path && !S.gen.manual[n]) S.gen.manual[n] = i.path; }); Object.keys(GAP.pick).forEach(n => { S.gen.manual[n] = GAP.pick[n]; }); }
+  function gapAssemble(){
+    const g = gapInfo(); if(!g) return;
+    const byNum = {}; S.imgs.forEach(i => { const n = imgNum(i); if(isFinite(n) && !byNum[n]) byNum[n] = i; });
+    Object.keys(GAP.pick).forEach(n => { const p = GAP.pick[n]; byNum[n] = {name:baseName(p), path:p, url:fileUrl(p)}; });
+    Object.keys(byNum).forEach(n => { byNum[n] = Object.assign({}, byNum[n], {n:+n}); });
+    const out = []; let still = []; for(let n = 1; n <= g.N; n++){ if(byNum[n]) out.push(byNum[n]); else still.push(n); }
+    if(still.length && !confirm('Всё ещё не хватает номеров: '+ranges(still)+'. Картинки после пропусков сдвинутся относительно текста. Применить всё равно?')) return;
+    S.imgs.forEach(i => { if(i.url && i.url.startsWith('blob:') && !out.includes(i)) URL.revokeObjectURL(i.url); });
+    pushUndoSafe(); S.imgs = out; GAP.pick = {}; S.rendered = false; renderFiles(); refresh(); touch(); gapRender(); toast(still.length ? 'Картинки добавлены, пропусков осталось: '+still.length : 'Все картинки на своих местах');
+  }
+  function pushUndoSafe(){ try{ if(S.starts.length > 1 && typeof pushUndo === 'function') pushUndo(); }catch(e){} }
+  $('gapOpen').onclick = () => { GAP.pick = {}; gapRender(); $('gapModal').classList.add('on'); };
+  $('gapClose').onclick = () => $('gapModal').classList.remove('on');
+  $('gapApply').onclick = gapAssemble;
+  $('gapCopy').onclick = async () => { const g = gapInfo(), pr = parsePrompts(S.gen.text || ''); if(!g) return; const txt = g.miss.map(n => n+'. '+(pr[n-1] || '')).join('\n\n'); try{ await navigator.clipboard.writeText(txt); toast('Промты скопированы: '+g.miss.length); }catch(e){ toast('Не удалось скопировать'); } };
+  $('gapGen').onclick = () => { gapSeedManual(); touch(); $('gapModal').classList.remove('on'); $('genOpen').click(); toast('Откройте Gemini и нажмите «Старт»: программа сделает только недостающие'); };
+
+  
+  /* ---------- release calendar ---------- */
+  const CAL = {y:new Date().getFullYear(), m:new Date().getMonth()};
+  const pad2 = n => (n<10?'0':'')+n;
+  const dKey = d => d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+  const dParse = k => { const a = (k||'').split('-'); return new Date(+a[0], +a[1]-1, +a[2]); };
+  function stageOf(t){
+    const m = t.sum || {}, pl = t.plan || {};
+    if(pl.up) return 'Загружено';
+    if(m.rendered) return 'Видео собрано';
+    if(m.mode==='done') return 'Размечено';
+    if(m.rec || m.mode==='rec') return 'Разметка';
+    if(m.audio) return 'Озвучка';
+    if(m.n) return 'Картинки';
+    if(m.t) return 'Сценарий';
+    return 'Идея';
+  }
+  function planLabel(t){
+    const pl = t.plan || {};
+    const dd = pl.up ? 'загружено '+dParse(pl.up).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}) : (pl.date ? 'выход '+dParse(pl.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}) : 'дата не назначена');
+    return stageOf(t)+' · '+dd;
+  }
+  function setPlan(t, patch){ t.plan = Object.assign({}, t.plan || {}, patch); if(!t.plan.date) delete t.plan.date; if(!t.plan.up) delete t.plan.up; save(); }
+  function calNudges(){
+    const all = []; DB.channels.forEach(c => c.tabs.forEach(t => all.push({c,t})));
+    const today = dParse(dKey(new Date())), out = [];
+    let last = null; all.forEach(({t}) => { const u = t.plan && t.plan.up; if(u){ const d = dParse(u); if(!last || d > last) last = d; } });
+    if(last){ const n = Math.round((today - last)/864e5); out.push(n<=0 ? 'Последняя загрузка: сегодня.' : 'Последняя загрузка была '+n+' '+(n%10===1&&n%100!==11?'день':(n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)?'дня':'дней'))+' назад.'); }
+    else out.push('Пока нет ни одного отмеченного как загруженное видео.');
+    const end = new Date(today.getTime()+6*864e5);
+    const has = all.some(({t}) => { const pl = t.plan; if(!pl || !pl.date || pl.up) return false; const d = dParse(pl.date); return d >= today && d <= end; });
+    if(!has) out.push('На ближайшие 7 дней в плане ничего нет.');
+    const late = all.filter(({t}) => { const pl = t.plan; return pl && pl.date && !pl.up && dParse(pl.date) < today; }).length;
+    if(late) out.push('Просрочено: '+late+' (дата прошла, а видео не отмечено загруженным).');
+    return out.join(' ');
+  }
+  function renderCal(){
+    const first = new Date(CAL.y, CAL.m, 1), todayK = dKey(new Date());
+    $('calTitle').textContent = first.toLocaleDateString('ru-RU',{month:'long', year:'numeric'});
+    $('calNudge').textContent = calNudges();
+    const g = $('calGrid'); g.innerHTML = '';
+    ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].forEach(n => { const h = document.createElement('div'); h.className = 'hint'; h.style.textAlign = 'center'; h.textContent = n; g.appendChild(h); });
+    const off = (first.getDay()+6)%7, days = new Date(CAL.y, CAL.m+1, 0).getDate();
+    const by = {}; DB.channels.forEach(c => c.tabs.forEach(t => { const pl = t.plan || {}; const k = pl.up || pl.date; if(k) (by[k] = by[k] || []).push({c,t}); }));
+    for(let i=0;i<off;i++) g.appendChild(document.createElement('div'));
+    for(let d=1; d<=days; d++){
+      const k = CAL.y+'-'+pad2(CAL.m+1)+'-'+pad2(d);
+      const cell = document.createElement('div'); cell.dataset.day = k;
+      cell.style.cssText = 'min-height:64px;border:1px solid '+(k===todayK?'var(--accent)':'var(--line)')+';border-radius:8px;padding:3px;background:var(--panel2);font-size:11px;overflow:hidden';
+      const num = document.createElement('div'); num.className = 'hint'; num.textContent = d; cell.appendChild(num);
+      (by[k]||[]).forEach(({c,t}) => {
+        const ch = document.createElement('div'); const up = t.plan && t.plan.up;
+        ch.className = 'calchip'; ch.textContent = (up?'[v] ':'')+(t.name||'Без названия'); ch.title = (c.name||'')+' · '+stageOf(t);
+        ch.style.cssText = 'cursor:pointer;border-radius:5px;padding:1px 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:'+(up?'#2e7d4f':'var(--accent)')+';color:#fff';
+        ch.onclick = () => { $('calModal').classList.remove('on'); setView('work'); switchTab(t.id); };
+        cell.appendChild(ch);
+      });
+      g.appendChild(cell);
+    }
+    const L = $('calList'); L.innerHTML = '';
+    DB.channels.forEach(c => c.tabs.forEach(t => {
+      const m = t.sum || {}; if(!(m.n || m.audio || m.t || m.rec || (t.plan && (t.plan.date||t.plan.up)))) return;
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+      const nm = document.createElement('span'); nm.style.cssText = 'flex:1;min-width:160px'; nm.textContent = (t.name||'Без названия')+' ('+(c.name||'канал')+') · '+stageOf(t);
+      const di = document.createElement('input'); di.type = 'date'; di.value = (t.plan && t.plan.date) || ''; di.className = 'calDate';
+      di.onchange = () => { setPlan(t, {date: di.value}); renderCal(); if(VIEW==='lib') renderLibrary(); };
+      const lb = document.createElement('label'); lb.style.cssText = 'display:flex;gap:4px;align-items:center';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!(t.plan && t.plan.up);
+      cb.onchange = () => { setPlan(t, {up: cb.checked ? dKey(new Date()) : ''}); renderCal(); if(VIEW==='lib') renderLibrary(); };
+      lb.append(cb, document.createTextNode('Загружено'));
+      row.append(nm, di, lb); L.appendChild(row);
+    }));
+    if(!L.children.length) L.innerHTML = '<div class="hint">Проектов пока нет.</div>';
+  }
+  function openCal(){ renderCal(); $('calModal').classList.add('on'); }
+  $('calOpen').onclick = openCal; $('calClose').onclick = () => $('calModal').classList.remove('on');
+  $('calPrev').onclick = () => { CAL.m--; if(CAL.m<0){ CAL.m = 11; CAL.y--; } renderCal(); };
+  $('calNext').onclick = () => { CAL.m++; if(CAL.m>11){ CAL.m = 0; CAL.y++; } renderCal(); };
+  $('calToday').onclick = () => { const n = new Date(); CAL.y = n.getFullYear(); CAL.m = n.getMonth(); renderCal(); };
 
   Object.defineProperty(window,'__autocut',{get:()=>S}); // for debugging
   if(NATIVE && NATIVE.info) NATIVE.info().then(i => { $('ver').textContent = 'v'+i.version; try{ const last = localStorage.getItem('autocut.lastver'); if(last && last!==i.version) setTimeout(() => toast('Программа обновлена до v'+i.version), 600); localStorage.setItem('autocut.lastver', i.version); }catch(e){} }).catch(()=>{});
