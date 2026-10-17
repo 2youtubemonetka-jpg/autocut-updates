@@ -713,6 +713,8 @@
     if(!pg){ const c = await G.cdp.send('Target.createTarget', {url: GEN.url}); pg = {targetId: c.targetId}; }
     const a = await G.cdp.send('Target.attachToTarget', {targetId: pg.targetId, flatten: true}); G.sid = a.sessionId;
     await G.cdp.send('Page.enable', {}, G.sid); await G.cdp.send('Runtime.enable', {}, G.sid);
+    // the page must behave as focused and visible even when another window is on top of it
+    try{ await G.cdp.send('Emulation.setFocusEmulationEnabled', {enabled:true}, G.sid); }catch(e){}
   }
   const gEval = async expr => { const r = await G.cdp.send('Runtime.evaluate', {expression: expr, returnByValue: true, awaitPromise: true}, G.sid); return r.result ? r.result.value : undefined; };
   async function genScene(n, prompt, tok){
@@ -729,7 +731,13 @@
     if(!ok) throw new Error('Не найдено поле ввода. Войдите в аккаунт Google в окне Chrome.');
     await gsleep(1200);
     await cdp.send('Input.insertText', {text: prompt}, sid); await gsleep(900);
-    for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid);
+    const hidden = async () => (await gEval('document.visibilityState').catch(() => 'visible')) !== 'visible';
+    // a covered or minimised window draws no frames, so real key and mouse events can be lost: then press the buttons from inside the page
+    let sent = false;
+    if(await hidden()){
+      sent = await gEval('(()=>{const re=/send|отправ|надісл/i; for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.className||""); if(re.test(l)&&!/stop|останов|зупин/i.test(l)&&!b.disabled){b.click(); return true;}} return false;})()').catch(() => false);
+    }
+    if(!sent) for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid);
     // wait for the download button of the finished picture
     const re = GEN.dlRe.source; let rect = null; t0 = Date.now();
     while(Date.now()-t0 < GEN.waitImage && !dead()){
@@ -744,9 +752,15 @@
       const h = d => { if(d.method==='Browser.downloadProgress' && d.params.state==='completed'){ clearTimeout(to); cdp.ev = cdp.ev.filter(f => f!==h); ok(d.params.guid); }
                         else if(d.method==='Browser.downloadProgress' && d.params.state==='canceled'){ clearTimeout(to); cdp.ev = cdp.ev.filter(f => f!==h); no(new Error('Скачивание отменено')); } };
       cdp.ev.push(h); });
-    await cdp.send('Input.dispatchMouseEvent', {type:'mouseMoved', x:rect.x, y:rect.y}, sid);
-    await cdp.send('Input.dispatchMouseEvent', {type:'mousePressed', x:rect.x, y:rect.y, button:'left', clickCount:1}, sid);
-    await cdp.send('Input.dispatchMouseEvent', {type:'mouseReleased', x:rect.x, y:rect.y, button:'left', clickCount:1}, sid);
+    let clicked = false;
+    if(await hidden()){
+      clicked = await gEval('(()=>{const re=new RegExp('+JSON.stringify(re)+',"i"); for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||""); if(re.test(l)){b.click(); return true;}} return false;})()').catch(() => false);
+    }
+    if(!clicked){
+      await cdp.send('Input.dispatchMouseEvent', {type:'mouseMoved', x:rect.x, y:rect.y}, sid);
+      await cdp.send('Input.dispatchMouseEvent', {type:'mousePressed', x:rect.x, y:rect.y, button:'left', clickCount:1}, sid);
+      await cdp.send('Input.dispatchMouseEvent', {type:'mouseReleased', x:rect.x, y:rect.y, button:'left', clickCount:1}, sid);
+    }
     const guid = await got;
     await gsleep(400);
     const src = G.tmp + (/\\/.test(G.tmp) ? '\\' : '/') + guid, dst = G.dir + G.sep + imgName(n);
