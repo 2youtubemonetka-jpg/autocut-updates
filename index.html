@@ -301,7 +301,7 @@
 <div class="app">
 
   <aside class="side">
-    <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small><span class="themes" id="themes" title="Цвет интерфейса"><button data-t="dark" style="background:#e63946" title="Тёмная"></button><button data-t="purple" style="background:#8f4dff" title="Фиолетовая"></button><button data-t="light" style="background:#e9ebf1" title="Светлая"></button></span><button class="gear" id="setOpen" title="Цвета, фон, звуки, горячие клавиши, язык, поддержка" aria-label="Настройки">&#9881;</button></div>
+    <div class="brand"><i>▶</i> AutoCut <small id="ver" style="font-weight:400;font-size:11px;color:var(--dim);margin-left:auto"></small><span class="themes" id="themes" title="Цвет интерфейса" style="display:none"><button data-t="dark" style="background:#e63946" title="Тёмная"></button><button data-t="purple" style="background:#8f4dff" title="Фиолетовая"></button><button data-t="light" style="background:#e9ebf1" title="Светлая"></button></span><button class="gear" id="setOpen" title="Цвета, фон, звуки, горячие клавиши, язык, поддержка" aria-label="Настройки">&#9881;</button></div>
 
     <div class="nav"><button id="navWork" class="on">Работа</button><button id="navLib">Библиотека<span id="libCnt">0</span></button></div>
 
@@ -483,25 +483,6 @@
     </div>
 
     <div class="sec">
-      <h4>Готовое видео</h4>
-      <div class="tools">
-        <button class="btn full" id="pfOpen" title="Найти проблемы до сборки: пропавшие файлы, длинные строки, звук короче разметки">Проверить проект</button>
-        <button class="btn" id="hsOpen" title="Автоматические сохранения перед крупными действиями, можно вернуться назад">История версий</button>
-        <button class="btn full" id="pkOpen" title="Папка для загрузки на YouTube: обложка, название, описание с главами, теги, источники">Пакет для загрузки</button>
-        <button class="btn" id="thOpen" title="Обложка 1280x720 из кадра видео с крупным текстом">Обложка</button>
-        <button class="btn" id="chOpen" title="Список глав с временем для описания на YouTube">Главы</button>
-        <button class="btn" id="fdOpen" title="Перейти к кадру по номеру или найти по тексту (Ctrl+F)">Поиск кадра</button>
-        <button class="btn" id="hkOpen" title="Список горячих клавиш (клавиша ?)">Горячие клавиши</button>
-        <button class="btn" id="snhOpen" title="Программа прочитает текст и предложит, где поставить звук: огонь, сирена, удар, часы и т.д. Вы отмечаете галочками, что оставить">Подсказки по звукам</button>
-        <button class="btn" id="simOpen" title="Найти соседние кадры с почти одинаковыми картинками">Похожие картинки</button>
-        <button class="btn" id="rhOpen" title="Длина кадров, темп речи, места, где зритель может заскучать">Разбор ритма</button>
-        <button class="btn" id="shOpen" style="display:none">Shorts 9:16</button>
-        <button class="btn" id="qOpen" style="display:none">Очередь</button>
-        <button class="btn full" id="bkOpen" style="display:none" title="Сохранить проект со всеми файлами в папку или на флешку">Резервная копия</button>
-      </div>
-    </div>
-
-    <div class="sec">
       <h4>Настройки</h4>
       <div class="row" style="margin-bottom:8px">
         <span style="color:var(--dim);font-size:13.5px;flex:1">Скорость звука</span>
@@ -518,6 +499,25 @@
     </div>
     <button class="btn" id="asrBtn" style="display:none;width:100%;margin-top:-6px" title="Программа распознает речь и точно найдёт начало каждой строки (первый раз скачает модуль)">Разметить по речи (точно)</button>
     <button class="btn" id="auto" disabled style="width:100%;margin-top:-6px" title="Программа сама найдёт, где заканчивается каждая строка, по паузам в озвучке">Разметить автоматически</button>
+
+    <div class="sec">
+      <h4>Готовое видео</h4>
+      <div class="tools">
+        <button class="btn full" id="pfOpen" title="Найти проблемы до сборки: пропавшие файлы, длинные строки, звук короче разметки">Проверить проект</button>
+        <button class="btn" id="hsOpen" title="Автоматические сохранения перед крупными действиями, можно вернуться назад">История версий</button>
+        <button class="btn" id="qOpen" style="display:none">Очередь</button>
+        <button class="btn full" id="pkOpen" title="Папка для загрузки на YouTube: обложка, название, описание с главами, теги, источники">Пакет для загрузки</button>
+        <button class="btn" id="thOpen" title="Обложка 1280x720 из кадра видео с крупным текстом">Обложка</button>
+        <button class="btn" id="chOpen" title="Список глав с временем для описания на YouTube">Главы</button>
+        <button class="btn" id="fdOpen" title="Перейти к кадру по номеру или найти по тексту (Ctrl+F)">Поиск кадра</button>
+        <button class="btn" id="hkOpen" title="Список горячих клавиш (клавиша ?)">Горячие клавиши</button>
+        <button class="btn" id="snhOpen" title="Программа прочитает текст и предложит, где поставить звук: огонь, сирена, удар, часы и т.д. Вы отмечаете галочками, что оставить">Подсказки по звукам</button>
+        <button class="btn" id="simOpen" title="Найти соседние кадры с почти одинаковыми картинками">Похожие картинки</button>
+        <button class="btn" id="rhOpen" title="Длина кадров, темп речи, места, где зритель может заскучать">Разбор ритма</button>
+        <button class="btn" id="shOpen" style="display:none">Shorts 9:16</button>
+        <button class="btn full" id="bkOpen" style="display:none" title="Сохранить проект со всеми файлами в папку или на флешку">Резервная копия</button>
+      </div>
+    </div>
 
     <div class="keys" id="keys"></div>
     <div class="hint" id="licLine" style="margin:10px 0 0;display:none"></div>
