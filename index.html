@@ -242,6 +242,9 @@
   .swatches i.on{border-color:var(--text);box-shadow:0 0 0 2px var(--bg) inset}
   #setModal input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
   #setKeysHost .keys{margin-top:0;font-size:14px}
+  #setModal.peek{background:rgba(10,12,18,.12)}
+  html.has-bg .side,html.has-bg .textcur,html.has-bg .textnext,html.has-bg .editor,html.has-bg .pcard,html.has-bg .tab,html.has-bg .stat,html.has-bg .drop{-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+  html.has-bg .card{background:var(--panelS,var(--panel));backdrop-filter:none}
   #uiBg{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;display:none}
   html.has-bg #uiBg{display:block}html.has-bg body{background:transparent}
   #setMirror .mr{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:13.5px}#setMirror .mr span{flex:1}
@@ -624,7 +627,7 @@
 <div class="modal" id="setModal"><div class="card wide" style="width:min(860px,96vw)">
   <h2 style="margin-bottom:10px">Настройки</h2>
   <div class="settabs" id="setTabs">
-    <button data-tab="look" class="on">Внешний вид</button><button data-tab="snd">Звуки программы</button><button data-tab="keys">Горячие клавиши</button><button data-tab="gen">Основное</button><button data-tab="lang">Язык</button><button data-tab="sup">Поддержка</button>
+    <button data-tab="look" class="on">Внешний вид</button><button data-tab="snd">Звуки программы</button><button data-tab="keys">Горячие клавиши</button><button data-tab="lang">Язык</button><button data-tab="sup">Поддержка</button>
   </div>
   <div class="setpane on" data-pane="look">
     <h4>Цвет программы</h4>
@@ -635,6 +638,7 @@
     <h4>Свой фон</h4>
     <div class="row" style="gap:8px;margin-bottom:8px"><button class="btn" id="setBgPick" style="width:auto">Выбрать картинку…</button><button class="btn" id="setBgDel" style="width:auto;display:none">Убрать фон</button><span class="hint" id="setBgName" style="margin:0">Фон не выбран</span></div>
     <input type="file" id="setBgFile" accept="image/*" style="display:none">
+    <div id="setBgPrev" style="aspect-ratio:16/7;max-height:150px;border-radius:10px;border:1px solid var(--line);background:var(--stage) center/cover no-repeat;margin-bottom:10px;display:none"></div>
     <div class="row" style="gap:8px"><span style="color:var(--dim);width:120px">Затемнение фона</span><input type="range" id="setBgDim" min="0" max="95" value="60" style="flex:1"><b id="setBgDimV" style="width:42px">60%</b></div>
     <p class="hint">Картинка ложится за всей программой, панели становятся чуть прозрачными. Чем больше затемнение, тем легче читать текст.</p>
   </div>
@@ -651,10 +655,6 @@
   <div class="setpane" data-pane="keys">
     <p class="hint" style="margin-top:0">Нажмите на клавишу в списке, потом на новую. Esc: отмена, Delete: убрать клавишу. Остальные клавиши смотрите на «?».</p>
     <div id="setKeysHost"></div>
-  </div>
-  <div class="setpane" data-pane="gen">
-    <p class="hint" style="margin-top:0">Те же настройки, что и в левой и правой панелях, только собраны в одном месте. Меняйте где удобнее: всё связано.</p>
-    <div id="setMirror" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 18px"></div>
   </div>
   <div class="setpane" data-pane="lang">
     <h4>Язык программы</h4>
@@ -3921,7 +3921,7 @@ const AutoAlign = (function(){
   const hexRgb = h => { const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h || ''); return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null; };
   function applyUi(){
     const r = document.documentElement, st = r.style;
-    ['--accent','--accent2','--tint','--nowbg','--panel','--panel2'].forEach(k => st.removeProperty(k)); r.classList.remove('has-bg');
+    ['--accent','--accent2','--tint','--nowbg','--panel','--panel2','--panelS'].forEach(k => st.removeProperty(k)); r.classList.remove('has-bg');
     const a = hexRgb(UI.accent); if(a){ st.setProperty('--accent', UI.accent); st.setProperty('--tint', 'rgba('+a.join(',')+',.16)'); st.setProperty('--nowbg', 'rgba('+a.join(',')+',.22)'); }
     if(hexRgb(UI.accent2)) st.setProperty('--accent2', UI.accent2);
     const bg = $('uiBg');
@@ -3929,7 +3929,7 @@ const AutoAlign = (function(){
       const base = getComputedStyle(r).getPropertyValue('--bg').trim(), rgb = hexRgb(base) || [15,17,21], d = Math.max(0, Math.min(95, +UI.dim || 0))/100;
       bg.style.backgroundImage = 'linear-gradient(rgba('+rgb.join(',')+','+d+'),rgba('+rgb.join(',')+','+d+')),url("'+fileUrl(UI.bg)+'")';
       r.classList.add('has-bg');
-      const cs = getComputedStyle(r); st.setProperty('--panel', 'color-mix(in srgb, '+cs.getPropertyValue('--panel').trim()+' 82%, transparent)'); st.setProperty('--panel2', 'color-mix(in srgb, '+cs.getPropertyValue('--panel2').trim()+' 86%, transparent)');
+      const cs = getComputedStyle(r); st.setProperty('--panelS', cs.getPropertyValue('--panel').trim()); st.setProperty('--panel', 'color-mix(in srgb, '+cs.getPropertyValue('--panel').trim()+' 82%, transparent)'); st.setProperty('--panel2', 'color-mix(in srgb, '+cs.getPropertyValue('--panel2').trim()+' 86%, transparent)');
     } else bg.style.backgroundImage = '';
   }
   document.querySelectorAll('#themes button').forEach(b => b.addEventListener('click', () => setTimeout(applyUi, 0)));
@@ -3957,7 +3957,7 @@ const AutoAlign = (function(){
   function setPane(name){
     document.querySelectorAll('#setTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     document.querySelectorAll('#setModal .setpane').forEach(p => p.classList.toggle('on', p.dataset.pane === name));
-    if(name === 'gen') setMirror();
+    $('setModal').classList.toggle('peek', name === 'look');
     if(name === 'keys'){ const host = $('setKeysHost'), k = $('keys'); if(k.parentNode !== host) host.appendChild(k); renderKeys(); }
     if(name === 'lang') $('setLang').value = UI.lang || 'ru';
     if(name === 'sup') $('setVer').textContent = 'Версия программы: '+(($('ver').textContent || '').replace(/^v/, '') || 'неизвестна');
@@ -4006,11 +4006,11 @@ const AutoAlign = (function(){
     $('setAccPick').oninput = e => { UI.accent = e.target.value; uiSave(); applyUi(); setSwatches('setAcc', UI_ACC, 'accent', '#e63946'); };
     $('setAcc2Pick').oninput = e => { UI.accent2 = e.target.value; uiSave(); applyUi(); setSwatches('setAcc2', UI_ACC2, 'accent2', '#ffb703'); };
     $('setColReset').onclick = () => { UI.accent = ''; UI.accent2 = ''; uiSave(); applyUi(); setSwatches('setAcc', UI_ACC, 'accent', '#e63946'); setSwatches('setAcc2', UI_ACC2, 'accent2', '#ffb703'); $('setAccPick').value = '#e63946'; $('setAcc2Pick').value = '#ffb703'; toast('Цвета сброшены'); };
-    const bgUpd = () => { $('setBgDel').style.display = UI.bg ? '' : 'none'; $('setBgName').textContent = UI.bg ? UI.bg.split(/[\\/]/).pop() : 'Фон не выбран'; $('setBgDim').value = UI.dim; $('setBgDimV').textContent = UI.dim+'%'; };
+    const bgUpd = () => { $('setBgDel').style.display = UI.bg ? '' : 'none'; $('setBgName').textContent = UI.bg ? UI.bg.split(/[\\/]/).pop() : 'Фон не выбран'; $('setBgDim').value = UI.dim; $('setBgDimV').textContent = UI.dim+'%'; const pv = $('setBgPrev'); pv.style.display = UI.bg ? '' : 'none'; if(UI.bg){ const c = hexRgb(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()) || [15,17,21], d = Math.max(0, Math.min(95, +UI.dim || 0))/100; pv.style.backgroundImage = 'linear-gradient(rgba('+c.join(',')+','+d+'),rgba('+c.join(',')+','+d+')),url("'+fileUrl(UI.bg)+'")'; } };
     $('setBgPick').onclick = () => { if(!NATIVE){ toast('Свой фон выбирается только в программе AutoCut для Windows'); return; } $('setBgFile').click(); };
     $('setBgFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; const p = NATIVE ? NATIVE.pathFor(f) : ''; if(!p){ toast('Не удалось получить путь к файлу'); return; } UI.bg = p; uiSave(); applyUi(); bgUpd(); };
     $('setBgDel').onclick = () => { UI.bg = ''; uiSave(); applyUi(); bgUpd(); };
-    $('setBgDim').oninput = e => { UI.dim = +e.target.value; $('setBgDimV').textContent = UI.dim+'%'; uiSave(); applyUi(); };
+    $('setBgDim').oninput = e => { UI.dim = +e.target.value; $('setBgDimV').textContent = UI.dim+'%'; uiSave(); applyUi(); bgUpd(); };
     bgUpd();
     $('setClickOn').checked = !!UI.click; $('setDoneOn').checked = !!UI.done; $('setSndVol').value = UI.vol;
     fillSndSel('setClickKind', 'click'); fillSndSel('setDoneKind', 'done');
