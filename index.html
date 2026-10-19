@@ -1317,7 +1317,17 @@
   const LOC = () => ({en:'en-US', uk:'uk-UA'})[(typeof UI === 'object' && UI.lang) || 'ru'] || 'ru-RU';
   const glog = t => { const el = $('gLog'); const d = document.createElement('div'); d.textContent = new Date().toLocaleTimeString(LOC())+'  '+t; el.appendChild(d); el.scrollTop = el.scrollHeight; };
   function parsePrompts(txt){
-    return String(txt||'').replace(/\r/g,'').split(/\n\s*\n/).map(p => p.split('\n').map(l => l.trim()).filter(Boolean).join(' ').replace(/^\d{1,4}[.)]\s+/, '')).filter(Boolean);
+    return String(txt||'').replace(/\r/g,'').split(/\n\s*\n/).filter(p => !/^\s*(ЧАСТЬ|ЧАСТИНА|ГЛАВА|PART|CHAPTER|SECTION)\s*\d+[^\n]*$/i.test(p)).map(p => p.split('\n').map(l => l.trim()).filter(Boolean).join(' ').replace(/^\d{1,4}[.)]\s+/, '')).filter(Boolean);
+  }
+  // New prompt set pasted into a project whose folder already has images from another set: offer a fresh folder, otherwise old images count as done.
+  async function setChanged(oldTxt, newTxt){
+    const o = parsePrompts(oldTxt), n = parsePrompts(newTxt); if(!n.length) return;
+    if(o.length && o[0] === n[0] && o[o.length-1] === n[n.length-1]) return;
+    let d; try{ d = await doneSet(); }catch(e){ return; } if(!d.size) return;
+    if(confirm('В папке этого проекта уже есть картинки ('+d.size+' шт.), они от других промтов.\n\nОК: начать с нуля в новой папке (старые останутся на месте).\nОтмена: оставить эту папку и считать старые картинки готовыми.')){
+      const f = findTab(activeId); S.gen.key = ((f&&f.t.name)||'Видео')+'_'+String(activeId).slice(-4)+'_'+Date.now().toString(36).slice(-4);
+      S.gen.manual = {}; await genDirFor(); touch(); toast('Новая папка для картинок создана');
+    }
   }
   const ranges = a => { const r = []; for(let i = 0; i < a.length; ){ let j = i; while(j+1 < a.length && a[j+1] === a[j]+1) j++; r.push(j > i ? a[i]+'-'+a[j] : ''+a[i]); i = j+1; } return r.join(', '); };
   const imgName = n => 'image_'+n+'.png';
@@ -1474,8 +1484,8 @@
       if(!NATIVE.gen){ toast('Для этой функции нужно один раз установить новую версию AutoCut (установщик скачайте заново).'); return; }
       $('gPrompts').value = S.gen.text || ''; $('gLog').innerHTML = ''; $('genModal').classList.add('on'); await genDirFor(); genStat();
     };
-    $('gPrompts').oninput = () => { S.gen.text = $('gPrompts').value; touch(); genStat(); };
-    $('gFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; $('gPrompts').value = await f.text(); S.gen.text = $('gPrompts').value; touch(); genStat(); };
+    $('gPrompts').oninput = async e => { const old = S.gen.text || '', nw = $('gPrompts').value; S.gen.text = nw; touch(); if(e && e.inputType === 'insertFromPaste' && nw.length > 500) await setChanged(old, nw); genStat(); };
+    $('gFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; const old = S.gen.text || ''; $('gPrompts').value = await f.text(); S.gen.text = $('gPrompts').value; touch(); await setChanged(old, S.gen.text); genStat(); };
     $('gLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:GEN.url}); glog(r.ok ? 'Chrome запущен. Войдите в Google, если нужно, и нажмите «Старт».' : 'Ошибка: '+r.error); };
     $('gMissCopy').onclick = async () => { const pr = parsePrompts($('gPrompts').value), d = await doneSet(); const txt = pr.map((p,i) => d.has(i+1) ? null : (i+1)+'. '+p).filter(Boolean).join('\n\n'); try{ await navigator.clipboard.writeText(txt); toast('Промты скопированы'); }catch(e){ $('gPrompts').value = txt; toast('Не удалось скопировать, промты показаны в поле'); } };
     $('gStart').onclick = genStart; $('gStop').onclick = () => { G.tok++; G.stop = true; try{ if(G.cdp) G.cdp.ws.close(); }catch(e){} G.cdp = null; G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none'; glog('Остановлено. Сделанные картинки сохранены, «Старт» продолжит с места остановки.'); genStat(); };
