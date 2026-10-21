@@ -290,6 +290,15 @@ async function addBookends(bin, outPath, opts, tmpRoot, reg) {
   fs.copyFileSync(tmpOut, outPath);
 }
 
+
+// scratch files go next to the finished video (same drive); the system temp drive is only a fallback
+function workBase(outPath){
+  try { const d = path.join(path.dirname(outPath), '.autocut_work'); fs.mkdirSync(d, { recursive: true }); fs.accessSync(d, fs.constants.W_OK); return d; } catch (_) { return os.tmpdir(); }
+}
+function freeBytes(dir){
+  try { const st = fs.statfsSync(dir); return Number(st.bavail) * Number(st.bsize); } catch (_) { return null; }
+}
+
 function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
   const bin = ffmpeg || ffmpegPath();
   const opts = Object.assign({}, (frames[0] && frames[0].opts) || {});
@@ -322,7 +331,10 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
     const fadeIn = Math.max(0, +opts.fadeIn || 0), fadeOutV = Math.max(0, +opts.fadeOut || 0);
     try { fs.writeFileSync(outPath.replace(/\.[^.\\/]+$/, '') + '_log.txt', 'AutoCut render log\n' + new Date().toISOString() + '\nframes=' + fr.length + ' subs=' + hasSubs + ' transitions=' + hasTr + ' fx=' + hasFx + ' film=' + !!film + '\nopts=' + JSON.stringify(Object.assign({}, opts, { blankPng: opts.blankPng ? 'yes' : '' })) + '\nos=' + process.platform + ' tmp=' + os.tmpdir() + '\n', 'utf8'); } catch (_) {}
     if (opts.normVoice) { opts.normMeasured = await measureLoud(bin, audioPath, reg); if (cancelled) throw new Error('cancelled'); }
-    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'autocut_'));
+    const WB = workBase(outPath);
+    { const need = total * ({ 720: 2, 1080: 4, 1440: 8, 2160: 14 }[+opts.height] || 4) * 1e6 * (opts.quality === 'high' ? 1.4 : 1) * 2 + 3e8, free = freeBytes(WB);
+      if (free !== null && free < need) throw new Error('Not enough free disk space: about ' + (need / 1e9).toFixed(1) + ' GB needed, ' + (free / 1e9).toFixed(1) + ' GB free on the drive of ' + WB + '. Free some space or choose a lower resolution or quality.'); }
+    const tmpRoot = fs.mkdtempSync(path.join(WB, 'autocut_'));
     let cacheDir = null, reused = 0;
     // if the loudness filter chain fails on some ffmpeg build, the same step is repeated without it
     const audioRetry = async build => {
@@ -359,7 +371,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
         const nFrames = counts.reduce((a, b) => a + b, 0);
         // finished clips are kept in a folder named after everything that shapes them: after a failure the next run reuses them
         const stat = f => { try { const t = fs.statSync(f); return t.size + ':' + Math.round(t.mtimeMs); } catch (_) { return ''; } };
-        const resumeRoot = path.join(os.tmpdir(), 'autocut_resume');
+        const resumeRoot = path.join(WB, 'autocut_resume');
         const key = clipKey({ fr: fr.map(f => Object.assign({}, f, { opts: undefined })), st: fr.map(f => stat(f.path)), film, vertical, q: opts.quality, fadeIn, fadeOutV, W: VW, H: VH, counts });
         cacheDir = path.join(resumeRoot, key); fs.mkdirSync(cacheDir, { recursive: true }); try { fs.utimesSync(cacheDir, new Date(), new Date()); } catch (_) {}
         purgeResume(resumeRoot, key);
