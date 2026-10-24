@@ -216,6 +216,9 @@
   /* modal */
   #licGate{position:fixed;inset:0;z-index:1000;background:var(--bg);display:none;place-items:center;padding:20px}
   #licGate.on{display:grid}
+  #proGate{position:fixed;inset:0;z-index:1000;background:var(--bg);display:none;place-items:center;padding:20px}
+  #proGate.on{display:grid}
+  #proGate .card{width:min(540px,94vw)}
   #licGate .card{width:min(520px,94vw)}
   #licGate input[type=text]{width:100%;font:600 18px/1.2 monospace;letter-spacing:1px;text-transform:uppercase;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);margin:10px 0}
   .modal{position:fixed;inset:0;background:rgba(10,12,18,.62);display:none;place-items:center;z-index:20}
@@ -629,6 +632,19 @@
   </div>
 </div>
 
+<div id="proGate">
+  <div class="card">
+    <h2>AutoCut Pro</h2>
+    <p style="margin:0 0 10px;color:var(--dim);font-size:14px;line-height:1.5">Чтобы пользоваться AutoCut, нужен ключ Pro. Цены, покупка ключа и вся информация про программу есть в нашем Telegram-канале:</p>
+    <div class="row" style="margin-bottom:12px"><div style="flex:1;font:700 18px/1.2 inherit">@hasgulik</div><button class="btn" id="pgTg" style="width:auto;margin:0;padding:7px 12px">Копировать</button></div>
+    <p style="margin:0 0 6px;color:var(--dim);font-size:14px;line-height:1.5">При покупке отправьте продавцу код этого компьютера. Ключ будет работать только на нём.</p>
+    <div class="row" style="margin-bottom:12px"><div id="pgMachine" style="flex:1;font:700 20px/1.2 monospace;letter-spacing:1px">...</div><button class="btn" id="pgCopy" style="width:auto;margin:0;padding:7px 12px">Копировать</button></div>
+    <textarea id="pgKey" rows="3" spellcheck="false" placeholder="Вставьте ключ сюда" style="width:100%;box-sizing:border-box;font:13px/1.4 monospace;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);resize:vertical"></textarea>
+    <div id="pgErr" style="color:#ff6b6b;font-size:13.5px;min-height:18px;margin:6px 0 8px"></div>
+    <button class="btn primary" id="pgGo">Активировать</button>
+  </div>
+</div>
+
 <div class="modal" id="setModal"><div class="card wide" style="width:min(860px,96vw)">
   <h2 style="margin-bottom:10px">Настройки</h2>
   <div class="settabs" id="setTabs">
@@ -897,7 +913,7 @@
 <div class="modal" id="lcModal"><div class="card mid">
   <h2>AutoCut Pro</h2>
   <p class="hint" id="lcStatus" style="margin:0 0 10px;font-weight:600"></p>
-  <p class="hint" style="margin:0 0 8px">Бесплатная версия умеет всё, но на готовом видео стоит надпись «Made with AutoCut». Pro убирает надпись. Пробный просмотр на 20 секунд всегда без надписи.</p>
+  <p class="hint" style="margin:0 0 8px">AutoCut работает по ключу Pro. Ключ привязан к этому компьютеру и действует до указанной даты. Продлить: Telegram @hasgulik.</p>
   <div class="throw"><span>Код компьютера</span><span style="display:flex;gap:6px;align-items:center"><input id="lcMachine" class="inp" readonly style="width:170px;font-family:monospace"><button class="btn" id="lcCopy" style="width:auto;flex:none;margin:0">Копировать</button></span></div>
   <div class="throw"><span>Наш Telegram</span><span style="display:flex;gap:6px;align-items:center"><b style="font-size:15px">@hasgulik</b><button class="btn" id="lcTg" style="width:auto;flex:none;margin:0">Копировать</button></span></div>
   <p class="hint" style="margin:4px 0 8px">Как купить: найдите в Telegram канал <b>@hasgulik</b>, там цены, новости и вся информация про AutoCut. Отправьте продавцу код этого компьютера. После оплаты вы получите ключ, который работает только на этом компьютере.</p>
@@ -2218,15 +2234,25 @@
     try{ await NATIVE.render({frames:[{opts:o}], audioPath:'', outPath:'license-check'}); }catch(_){}
     for(let i = 0; i < 40 && !got; i++) await sleep(25);
     progSink = prev;
-    if(got && !got.rejected) PRO = got;
+    if(got && !got.rejected){ PRO = got; pgApply(); }
     lcPaint(); return got;
   }
+  function pgLock(){
+    if(window.__licLocked !== true){ try{ stopAudio(); if(activeId) saveProject(activeId); }catch(e){} }
+    window.__licLocked = true;
+    $('pgMachine').textContent = (PRO && PRO.machine) || '...';
+    if(PRO && PRO.reason === 'expired') $('pgErr').textContent = 'Срок ключа закончился '+PRO.exp+'. Продлите Pro в Telegram @hasgulik.';
+    document.querySelectorAll('.modal.on').forEach(m => m.classList.remove('on'));
+    $('proGate').classList.add('on');
+  }
+  function pgUnlock(){ window.__licLocked = false; $('proGate').classList.remove('on'); $('pgErr').textContent = ''; }
+  function pgApply(){ if(PRO && PRO.ok) pgUnlock(); else pgLock(); }
   function lcPaint(){
     const L = PRO || {}, pro = !!L.ok, until = L.exp === 'LIFE' ? 'навсегда' : 'до '+L.exp;
-    if($('lcStatus')){ $('lcStatus').textContent = pro ? 'AutoCut Pro активен '+until : 'Сейчас бесплатная версия'+(L.reason === 'expired' ? ' (срок Pro закончился '+L.exp+')' : ''); $('lcStatus').style.color = pro ? '#3ad07a' : ''; }
+    if($('lcStatus')){ $('lcStatus').textContent = pro ? 'AutoCut Pro активен '+until : 'Ключ не активирован'+(L.reason === 'expired' ? ' (срок Pro закончился '+L.exp+')' : ''); $('lcStatus').style.color = pro ? '#3ad07a' : ''; }
     if($('lcMachine')) $('lcMachine').value = L.machine || '...';
     if($('lcOpen')) $('lcOpen').textContent = pro ? 'Pro '+until : 'Активировать Pro';
-    if($('lcNote')){ $('lcNote').style.display = PRO ? '' : 'none'; $('lcNote').textContent = pro ? 'AutoCut Pro '+until+': видео без надписи.' : 'Бесплатная версия: в углу готового видео будет надпись «Made with AutoCut». Убрать: кнопка «Активировать Pro» вверху, купить Pro: Telegram @hasgulik.'; }
+    if($('lcNote')){ $('lcNote').style.display = pro ? '' : 'none'; $('lcNote').textContent = pro ? 'AutoCut Pro '+until+': видео без надписи.' : 'Бесплатная версия: в углу готового видео будет надпись «Made with AutoCut». Убрать: кнопка «Активировать Pro» вверху, купить Pro: Telegram @hasgulik.'; }
   }
   if(NATIVE && NATIVE.v3){
     $('lcOpen').style.display = '';
@@ -2244,7 +2270,21 @@
     };
     $('lcDel').onclick = async () => { await lcQuery(''); $('lcErr').textContent = ''; toast('Ключ убран, включена бесплатная версия'); };
     $('bExport').addEventListener('click', () => { lcPaint(); lcQuery(); });
-    setTimeout(() => lcQuery(), 1200);
+    window.__licLocked = true; $('proGate').classList.add('on');
+    const tgCopy = async () => { try{ await navigator.clipboard.writeText('@hasgulik'); toast('Скопировано: @hasgulik. Найдите канал в Telegram'); }catch(_){ toast('Найдите в Telegram: @hasgulik'); } };
+    $('pgTg').onclick = tgCopy;
+    $('pgCopy').onclick = async () => { const v = $('pgMachine').textContent; try{ await navigator.clipboard.writeText(v); toast('Код скопирован: '+v); }catch(_){ toast('Код: '+v); } };
+    $('pgKey').addEventListener('keydown', e => e.stopPropagation());
+    $('pgGo').onclick = async () => {
+      const k = $('pgKey').value.replace(/\s+/g, ''); $('pgErr').textContent = '';
+      $('pgGo').disabled = true; const r = await lcQuery(k || undefined); $('pgGo').disabled = false;
+      if(!k){ if(!(PRO && PRO.ok)) $('pgErr').textContent = 'Вставьте ключ, который прислал продавец.'; return; }
+      if(!r){ $('pgErr').textContent = 'Не удалось проверить ключ. Перезапустите программу и попробуйте снова.'; return; }
+      if(r.ok){ $('pgKey').value = ''; toast('AutoCut Pro активирован'); }
+      else $('pgErr').textContent = LC_WHY[r.reason] || 'Ключ не подошёл.';
+    };
+    lcQuery();
+    setInterval(() => lcQuery(), 10*60000);
   }
 
   /* ---- Shorts ---- */
