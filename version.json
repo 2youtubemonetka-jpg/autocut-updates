@@ -1,8 +1,8 @@
 {
- "version": "3.3.1",
+ "version": "3.3.2",
  "minShell": 3,
  "files": {
-  "index.html": "cddbfaf481efc872545994098f3de1c6550eb1698ff3455656ab045d3f1589e6",
-  "render.js": "9d4f06b4c06606ceab6db39bfa02babd467e4cca476c6e7d6a7af5ccad9b7e6f"
+  "index.html": "67f0d0098a2c1439c7c15dbb65897aec177e44d1e6fa28dcdd0a548445282170",
+  "render.js": "3c476926aab32d7ae47e24b398d991ff8d8096e6a1fe2f58784396ec786db149"
  }
 }

@@ -358,7 +358,7 @@ function renderVideo({ frames, audioPath, outPath, onProgress, ffmpeg }) {
   const opts = Object.assign({}, (frames[0] && frames[0].opts) || {});
   if (opts.licenseQuery) { const st = licenseQuery(opts); if (onProgress) onProgress({ license: st }); return { promise: Promise.resolve(st), cancel: () => {} }; }
   const LIC = licenseStatus(), FREE = !LIC.ok;
-  if (FREE) throw new Error('Нужен ключ AutoCut Pro: нажмите «Активировать Pro» вверху. Купить ключ: Telegram @hasgulik');
+  if (FREE) throw new Error('Нужен ключ AutoCut Pro: нажмите «Активировать Pro» вверху. Купить ключ: Telegram @HasYst');
   const vertical = !!opts.vertical;
   const GEO = vertical ? [1920, 1080] : { 720: [1280, 720], 1080: [1920, 1080], 1440: [2560, 1440], 2160: [3840, 2160] }[+opts.height] || [1920, 1080];
   setGeom(GEO[0], GEO[1]);
