@@ -535,6 +535,7 @@
       <span class="pill" id="frameLbl">Кадр — / —</span>
       <span id="partLbl"></span>
       <span class="grow"></span>
+      <button class="btn" id="lcOpen" style="padding:3px 12px;font-size:12.5px;display:none" title="Убрать надпись Made with AutoCut с готовых видео">Активировать Pro</button>
       <button class="btn" id="bPark" style="padding:3px 12px;font-size:12.5px" title="Сохранить и убрать в библиотеку. Позже можно продолжить с этого же места">Отложить проект</button>
       <span id="modeLbl">Добавьте файлы слева</span>
     </div>
@@ -893,6 +894,16 @@
   <canvas id="wmCv" width="640" height="360" style="width:100%;border-radius:10px;border:1px solid var(--line);margin-top:6px;background:#1b1b24"></canvas>
   <div class="btns"><button class="btn primary" id="wmClose">Готово</button></div>
 </div></div>
+<div class="modal" id="lcModal"><div class="card mid">
+  <h2>AutoCut Pro</h2>
+  <p class="hint" id="lcStatus" style="margin:0 0 10px;font-weight:600"></p>
+  <p class="hint" style="margin:0 0 8px">Бесплатная версия умеет всё, но на готовом видео стоит надпись «Made with AutoCut». Pro убирает надпись. Пробный просмотр на 20 секунд всегда без надписи.</p>
+  <div class="throw"><span>Код компьютера</span><span style="display:flex;gap:6px;align-items:center"><input id="lcMachine" class="inp" readonly style="width:170px;font-family:monospace"><button class="btn" id="lcCopy" style="width:auto;flex:none;margin:0">Копировать</button></span></div>
+  <p class="hint" style="margin:4px 0 8px">Как купить: отправьте этот код продавцу. После оплаты вы получите ключ, который работает только на этом компьютере.</p>
+  <textarea id="lcKey" class="inp" rows="3" spellcheck="false" placeholder="Вставьте ключ сюда" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;resize:vertical"></textarea>
+  <p class="hint" id="lcErr" style="margin:6px 0 0;color:#ff6b6b"></p>
+  <div class="btns"><button class="btn" id="lcDel">Убрать ключ</button><button class="btn" id="lcClose">Закрыть</button><button class="btn primary" id="lcAct">Активировать</button></div>
+</div></div>
 <div class="modal" id="beModal"><div class="card mid">
   <h2>Заставка и концовка канала</h2>
   <p class="hint" style="margin:0 0 8px">Подставляются в каждое видео этого канала при сборке. Картинка показывается несколько секунд, видеофайл вставляется целиком. В пробный просмотр и Shorts не добавляются.</p>
@@ -1017,6 +1028,7 @@
   <div class="card">
     <h2>Запись завершена</h2>
     <p id="mInfo"></p>
+    <p class="hint" id="lcNote" style="margin:0 0 8px;display:none"></p>
     <button class="btn" id="eJson">timeline.json — тайминги всех кадров</button>
     <button class="btn" id="eCsv">timeline.csv — таблица для проверки</button>
     <button class="btn" id="eConcat">concat.txt — список для ffmpeg</button>
@@ -2193,6 +2205,45 @@
 
   /* ---- progress goes to whoever is rendering right now ---- */
   let progSink = null;
+
+  /* ---- AutoCut Pro license: the check itself lives in render.js (main process); here only the window ---- */
+  let PRO = null;
+  const LC_WHY = {none:'', format:'Это не похоже на ключ AutoCut. Скопируйте ключ целиком.', signature:'Ключ неверный. Скопируйте его целиком, без лишних символов.', machine:'Этот ключ выдан для другого компьютера. Отправьте продавцу код этого компьютера.', expired:'Срок ключа закончился. Продлите Pro у продавца.'};
+  async function lcQuery(setKey){
+    if(!(NATIVE && NATIVE.v3)) return null;
+    if(progSink || ($('eRender') && $('eRender').disabled)){ lcPaint(); return typeof setKey === 'string' ? null : PRO; }   // a video is being built right now
+    let got = null; const prev = progSink; progSink = v => { if(v && v.license) got = v.license; };
+    const o = {licenseQuery:true}; if(typeof setKey === 'string') o.setKey = setKey;
+    try{ await NATIVE.render({frames:[{opts:o}], audioPath:'', outPath:'license-check'}); }catch(_){}
+    for(let i = 0; i < 40 && !got; i++) await sleep(25);
+    progSink = prev;
+    if(got && !got.rejected) PRO = got;
+    lcPaint(); return got;
+  }
+  function lcPaint(){
+    const L = PRO || {}, pro = !!L.ok, until = L.exp === 'LIFE' ? 'навсегда' : 'до '+L.exp;
+    if($('lcStatus')){ $('lcStatus').textContent = pro ? 'AutoCut Pro активен '+until : 'Сейчас бесплатная версия'+(L.reason === 'expired' ? ' (срок Pro закончился '+L.exp+')' : ''); $('lcStatus').style.color = pro ? '#3ad07a' : ''; }
+    if($('lcMachine')) $('lcMachine').value = L.machine || '...';
+    if($('lcOpen')) $('lcOpen').textContent = pro ? 'Pro '+until : 'Активировать Pro';
+    if($('lcNote')){ $('lcNote').style.display = PRO ? '' : 'none'; $('lcNote').textContent = pro ? 'AutoCut Pro '+until+': видео без надписи.' : 'Бесплатная версия: в углу готового видео будет надпись «Made with AutoCut». Убрать: кнопка «Активировать Pro» вверху.'; }
+  }
+  if(NATIVE && NATIVE.v3){
+    $('lcOpen').style.display = '';
+    $('lcOpen').onclick = async () => { $('lcErr').textContent = ''; lcPaint(); $('lcModal').classList.add('on'); await lcQuery(); };
+    $('lcClose').onclick = () => $('lcModal').classList.remove('on');
+    $('lcCopy').onclick = async () => { const v = $('lcMachine').value; try{ await navigator.clipboard.writeText(v); toast('Код скопирован: '+v); }catch(_){ $('lcMachine').select(); document.execCommand('copy'); toast('Код скопирован'); } };
+    $('lcAct').onclick = async () => {
+      const k = $('lcKey').value.replace(/\s+/g, ''); $('lcErr').textContent = '';
+      if(!k){ $('lcErr').textContent = 'Вставьте ключ, который прислал продавец.'; return; }
+      $('lcAct').disabled = true; const r = await lcQuery(k); $('lcAct').disabled = false;
+      if(!r){ $('lcErr').textContent = 'Не удалось проверить ключ. Перезапустите программу и попробуйте снова.'; return; }
+      if(r.ok){ $('lcKey').value = ''; toast('AutoCut Pro активирован'); if(UI && UI.done) uiPlay('done'); }
+      else $('lcErr').textContent = LC_WHY[r.reason] || 'Ключ не подошёл.';
+    };
+    $('lcDel').onclick = async () => { await lcQuery(''); $('lcErr').textContent = ''; toast('Ключ убран, включена бесплатная версия'); };
+    $('bExport').addEventListener('click', () => { lcPaint(); lcQuery(); });
+    setTimeout(() => lcQuery(), 1200);
+  }
 
   /* ---- Shorts ---- */
   const fmtT = t => { t = Math.max(0, Math.round(t)); return Math.floor(t/60)+':'+String(t%60).padStart(2,'0'); };
