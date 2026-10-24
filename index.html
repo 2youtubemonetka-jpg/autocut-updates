@@ -899,7 +899,8 @@
   <p class="hint" id="lcStatus" style="margin:0 0 10px;font-weight:600"></p>
   <p class="hint" style="margin:0 0 8px">Бесплатная версия умеет всё, но на готовом видео стоит надпись «Made with AutoCut». Pro убирает надпись. Пробный просмотр на 20 секунд всегда без надписи.</p>
   <div class="throw"><span>Код компьютера</span><span style="display:flex;gap:6px;align-items:center"><input id="lcMachine" class="inp" readonly style="width:170px;font-family:monospace"><button class="btn" id="lcCopy" style="width:auto;flex:none;margin:0">Копировать</button></span></div>
-  <p class="hint" style="margin:4px 0 8px">Как купить: отправьте этот код продавцу. После оплаты вы получите ключ, который работает только на этом компьютере.</p>
+  <div class="throw"><span>Наш Telegram</span><span style="display:flex;gap:6px;align-items:center"><b style="font-size:15px">@hasgulik</b><button class="btn" id="lcTg" style="width:auto;flex:none;margin:0">Копировать</button></span></div>
+  <p class="hint" style="margin:4px 0 8px">Как купить: найдите в Telegram канал <b>@hasgulik</b>, там цены, новости и вся информация про AutoCut. Отправьте продавцу код этого компьютера. После оплаты вы получите ключ, который работает только на этом компьютере.</p>
   <textarea id="lcKey" class="inp" rows="3" spellcheck="false" placeholder="Вставьте ключ сюда" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;resize:vertical"></textarea>
   <p class="hint" id="lcErr" style="margin:6px 0 0;color:#ff6b6b"></p>
   <div class="btns"><button class="btn" id="lcDel">Убрать ключ</button><button class="btn" id="lcClose">Закрыть</button><button class="btn primary" id="lcAct">Активировать</button></div>
@@ -2225,12 +2226,13 @@
     if($('lcStatus')){ $('lcStatus').textContent = pro ? 'AutoCut Pro активен '+until : 'Сейчас бесплатная версия'+(L.reason === 'expired' ? ' (срок Pro закончился '+L.exp+')' : ''); $('lcStatus').style.color = pro ? '#3ad07a' : ''; }
     if($('lcMachine')) $('lcMachine').value = L.machine || '...';
     if($('lcOpen')) $('lcOpen').textContent = pro ? 'Pro '+until : 'Активировать Pro';
-    if($('lcNote')){ $('lcNote').style.display = PRO ? '' : 'none'; $('lcNote').textContent = pro ? 'AutoCut Pro '+until+': видео без надписи.' : 'Бесплатная версия: в углу готового видео будет надпись «Made with AutoCut». Убрать: кнопка «Активировать Pro» вверху.'; }
+    if($('lcNote')){ $('lcNote').style.display = PRO ? '' : 'none'; $('lcNote').textContent = pro ? 'AutoCut Pro '+until+': видео без надписи.' : 'Бесплатная версия: в углу готового видео будет надпись «Made with AutoCut». Убрать: кнопка «Активировать Pro» вверху, купить Pro: Telegram @hasgulik.'; }
   }
   if(NATIVE && NATIVE.v3){
     $('lcOpen').style.display = '';
     $('lcOpen').onclick = async () => { $('lcErr').textContent = ''; lcPaint(); $('lcModal').classList.add('on'); await lcQuery(); };
     $('lcClose').onclick = () => $('lcModal').classList.remove('on');
+    $('lcTg').onclick = async () => { try{ await navigator.clipboard.writeText('@hasgulik'); toast('Скопировано: @hasgulik. Найдите канал в Telegram'); }catch(_){ toast('Найдите в Telegram: @hasgulik'); } };
     $('lcCopy').onclick = async () => { const v = $('lcMachine').value; try{ await navigator.clipboard.writeText(v); toast('Код скопирован: '+v); }catch(_){ $('lcMachine').select(); document.execCommand('copy'); toast('Код скопирован'); } };
     $('lcAct').onclick = async () => {
       const k = $('lcKey').value.replace(/\s+/g, ''); $('lcErr').textContent = '';
