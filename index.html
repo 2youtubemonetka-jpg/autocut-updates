@@ -1801,14 +1801,25 @@
     }
     if(!ok) throw new Error('Не найдено поле ввода. Войдите в аккаунт Google в окне Chrome.');
     await gsleep(1200);
-    await cdp.send('Input.insertText', {text: prompt}, sid); await gsleep(900);
+    // Gemini answers some prompts with text only; an explicit request makes it draw
+    const ask = /^(generate|create|draw|make)\b|^(нарисуй|создай|сгенерируй)/i.test(prompt) ? prompt : 'Generate an image: '+prompt;
+    await cdp.send('Input.insertText', {text: ask}, sid); await gsleep(900);
     const hidden = async () => (await gEval('document.visibilityState').catch(() => 'visible')) !== 'visible';
+    const clickSend = () => gEval('(()=>{const re=/send|submit|отправ|надісл|enviar/i, bad=/stop|останов|зупин|micro|микроф|мікроф|voice|голос|attach|upload|загруз|add |добав|tools|инструм/i; for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||"")+" "+(typeof b.className==="string"?b.className:""); if(re.test(l)&&!bad.test(l)&&!b.disabled&&b.getAttribute("aria-disabled")!=="true"&&b.offsetParent!==null){b.click(); return true;}} return false;})()').catch(() => false);
+    const pressEnter = async () => { for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid); };
+    // the prompt counts as sent when the input box is empty again
+    const leftText = () => gEval('(()=>{for(const s of '+selJs+'){const e=document.querySelector(s); if(e&&e.offsetParent!==null) return (e.innerText||e.value||"").trim().length;} return 0;})()').catch(() => 0);
     // a covered or minimised window draws no frames, so real key and mouse events can be lost: then press the buttons from inside the page
-    let sent = false;
-    if(await hidden()){
-      sent = await gEval('(()=>{const re=/send|отправ|надісл/i; for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.className||""); if(re.test(l)&&!/stop|останов|зупин/i.test(l)&&!b.disabled){b.click(); return true;}} return false;})()').catch(() => false);
+    if(await hidden()){ if(!(await clickSend())) await pressEnter(); } else await pressEnter();
+    let sentOk = false;
+    for(let i = 0; i < 4 && !dead(); i++){
+      await gsleep(2500);
+      if(!(await leftText())){ sentOk = true; break; }
+      // the text is still in the box: the page was not ready or Enter was lost; try the send button, then Enter again
+      if(i % 2 === 0){ if(!(await clickSend())) await pressEnter(); } else await pressEnter();
     }
-    if(!sent) for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid);
+    if(dead()) throw new Error('stopped');
+    if(!sentOk) throw new Error('Gemini не отправил запрос: текст остался в поле. Обновите окно Gemini (F5) и проверьте, что вы вошли в аккаунт');
     // wait for the download button of the finished picture
     const re = GEN.dlRe.source; let rect = null; t0 = Date.now();
     while(Date.now()-t0 < GEN.waitImage && !dead()){
@@ -1816,7 +1827,7 @@
       if(rect) break; await gsleep(2000);
     }
     if(dead()) throw new Error('stopped');
-    if(!rect) throw new Error('Картинка не появилась за '+Math.round(GEN.waitImage/1000)+' с (возможно, лимит Gemini)');
+    if(!rect) throw new Error('Картинка не появилась за '+Math.round(GEN.waitImage/1000)+' с. Возможно, лимит Gemini или выбрана модель, которая не рисует (например Flash-Lite): выберите в Gemini модель с картинками');
     await gsleep(1500);
     rect = await gEval('(()=>{const re=new RegExp('+JSON.stringify(re)+',"i"); for(const b of document.querySelectorAll("button,[role=button]")){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("mattooltip")||"")+" "+(b.getAttribute("title")||""); if(re.test(l)){const r=b.getBoundingClientRect(); if(r.width>0) return {x:r.left+r.width/2,y:r.top+r.height/2};}} return null;})()') || rect;
     const got = new Promise((ok, no) => { const to = setTimeout(() => { cdp.ev = cdp.ev.filter(f => f!==h); no(new Error('Скачивание не началось')); }, GEN.waitDownload);
