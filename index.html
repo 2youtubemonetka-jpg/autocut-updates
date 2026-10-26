@@ -362,6 +362,7 @@
           <input type="file" id="fTxt" accept=".txt,text/plain"></label>
         <button class="btn" id="ttsOpen" style="display:none;width:100%">Озвучить текст (ElevenLabs)</button>
         <button class="btn" id="genOpen" style="display:none;width:100%" title="Программа сама сгенерирует картинки в Gemini по вашим промтам">Сгенерировать картинки (Gemini)</button>
+        <button class="btn" id="genOpenFlow" style="display:none;width:100%" title="То же самое через Google Flow. Папка и номера картинок общие с Gemini: готовые картинки не повторяются">Сгенерировать картинки (Google Flow)</button>
         <div class="hint" id="payHint" style="display:none;margin:0">Озвучка и картинки через ElevenLabs и Gemini требуют платных подписок. Подробности внутри каждого окна.</div>
       </div>
     </div>
@@ -1960,8 +1961,11 @@
     S.imgs = imgs; renderFiles(); refresh(); touch(); $('genModal').classList.remove('on'); toast('Картинок добавлено в проект: '+S.imgs.length);
   }
   if(NATIVE){
-    $('genOpen').style.display = '';
-    $('genOpen').onclick = async () => {
+    $('genOpen').style.display = ''; $('genOpenFlow').style.display = '';
+    const setProv = p => { GEN.prov = p; try{ localStorage.setItem('autocut.genprov', p); }catch(_){} try{ if(G.cdp && !G.run) { G.cdp.ws.close(); G.cdp = null; } }catch(_){} if($('gProv')){ $('gProv').value = p; $('gLaunch').textContent = 'Открыть '+genName(); } };
+    $('genOpenFlow').onclick = () => { if(G.run && GEN.prov !== 'flow'){ toast('Сейчас идёт генерация в Gemini. Остановите её, потом переключитесь на Flow'); return; } setProv('flow'); $('genOpen').__go(); };
+    $('genOpen').onclick = () => { if(G.run && GEN.prov !== 'gemini'){ toast('Сейчас идёт генерация во Flow. Остановите её, потом переключитесь на Gemini'); return; } setProv('gemini'); $('genOpen').__go(); };
+    $('genOpen').__go = async () => {
       if(!NATIVE.gen){ toast('Для этой функции нужно один раз установить новую версию AutoCut (установщик скачайте заново).'); return; }
       $('gPrompts').value = S.gen.text || ''; $('gLog').innerHTML = ''; $('genModal').classList.add('on'); await genDirFor(); genStat();
     };
@@ -4733,7 +4737,7 @@ const AutoAlign = (function(){
   $('gapClose').onclick = () => $('gapModal').classList.remove('on');
   $('gapApply').onclick = gapAssemble;
   $('gapCopy').onclick = async () => { const g = gapInfo(), pr = parsePrompts(S.gen.text || ''); if(!g) return; const txt = g.miss.map(n => n+'. '+(pr[n-1] || '')).join('\n\n'); try{ await navigator.clipboard.writeText(txt); toast('Промты скопированы: '+g.miss.length); }catch(e){ toast('Не удалось скопировать'); } };
-  $('gapGen').onclick = () => { gapSeedManual(); touch(); $('gapModal').classList.remove('on'); $('genOpen').click(); toast('Откройте Gemini и нажмите «Старт»: программа сделает только недостающие'); };
+  $('gapGen').onclick = () => { gapSeedManual(); touch(); $('gapModal').classList.remove('on'); ($('genOpen').__go ? $('genOpen').__go() : $('genOpen').click()); toast('Откройте Gemini и нажмите «Старт»: программа сделает только недостающие'); };
 
   
 
