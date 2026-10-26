@@ -1722,6 +1722,7 @@
   const genUrl = () => GEN.prov === 'flow' ? GEN.flowUrl : GEN.url;
   const genName = () => GEN.prov === 'flow' ? 'Google Flow' : 'Gemini';
   const genHost = () => GEN.prov === 'flow' ? /labs\.google/ : /gemini\.google\.com/;
+  const isFlowProject = u => /labs\.google/.test(u||'') && /\/tools\/flow\/./.test(u||'') && !/\/tools\/flow\/?(\?|#|$)/.test(u||'');
   const gsleep = ms => new Promise(r => setTimeout(r, ms));
   class Cdp {
     constructor(ws){ this.ws = ws; this.id = 0; this.cb = {}; this.ev = []; ws.onmessage = m => { const d = JSON.parse(m.data);
@@ -1789,7 +1790,12 @@
     await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = () => no(new Error('Не удалось подключиться к Chrome')); });
     G.cdp = new Cdp(ws);
     const t = await G.cdp.send('Target.getTargets'); let pg = (t.targetInfos||[]).filter(x => x.type==='page');
-    pg = (GEN.prov === 'flow' ? pg.find(x => /labs\.google.*\/project\//.test(x.url)) : null) || pg.find(x => genHost().test(x.url)) || (GEN.prov === 'flow' ? null : pg[0]);
+    if(GEN.prov === 'flow'){
+      const flows = pg.filter(x => /labs\.google/.test(x.url));
+      pg = flows.find(x => isFlowProject(x.url)) || flows[0];
+      if(!pg){ try{ G.cdp.ws.close(); }catch(_){} G.cdp = null;
+        throw new Error('В окне Chrome от AutoCut не открыт Google Flow. Нажмите «Открыть Google Flow» здесь, в программе, и откройте проект именно в этом окне (не в своём обычном браузере)'); }
+    } else pg = pg.find(x => genHost().test(x.url)) || pg[0];
     if(!pg){ const c = await G.cdp.send('Target.createTarget', {url: genUrl()}); pg = {targetId: c.targetId}; }
     const a = await G.cdp.send('Target.attachToTarget', {targetId: pg.targetId, flatten: true}); G.sid = a.sessionId;
     await G.cdp.send('Page.enable', {}, G.sid); await G.cdp.send('Runtime.enable', {}, G.sid);
@@ -1872,9 +1878,9 @@
   async function flowEnsureProject(){
     const cdp = G.cdp, sid = G.sid;
     let url = await gEval('location.href').catch(() => '') || '';
-    if(/labs\.google.*\/project\//.test(url)) G.flowProj = url.split('#')[0];
+    if(isFlowProject(url)) G.flowProj = url.split('#')[0];
     else if(G.flowProj){ glog('  Flow ушёл со страницы проекта, возвращаюсь в проект'); await cdp.send('Page.navigate', {url: G.flowProj}, sid); await gsleep(6000); url = await gEval('location.href').catch(() => '') || ''; }
-    if(!/labs\.google.*\/project\//.test(url)) throw new Error('Откройте в окне Chrome проект Google Flow (нажмите «Новый проект» или откройте свой) и нажмите «Старт» ещё раз. Сейчас открыто: '+String(url).slice(0,90));
+    if(!isFlowProject(url)) throw new Error('Откройте проект Google Flow в окне Chrome, которое открыл AutoCut (нажмите «Новый проект» или откройте свой), и нажмите «Старт» ещё раз. Сейчас открыто: '+String(url).slice(0,90));
   }
   async function flowSend(prompt, dead){
     const cdp = G.cdp, sid = G.sid, box = FLOW_BOX;
