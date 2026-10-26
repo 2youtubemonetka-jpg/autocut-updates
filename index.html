@@ -1885,50 +1885,86 @@
   /* ---- Google Flow: stay in the open Flow project, type the prompt, wait for a NEW picture, save it as PNG.
          If Flow makes 2 or 4 pictures per prompt, only the first new one is saved, so the numbering never shifts. ---- */
   // Flow shows long prompts cut off, and all our prompts start with the same style text: put the scene first so it is visible next to each picture
+  // Flow page parts (same selectors a working Flow extension uses): the prompt editor at the bottom, the generate button, finished pictures carry data-media-id
+  const FLOW_ED = '(()=>{const v=e=>e&&e.offsetParent!==null; const a=[...document.querySelectorAll("flow-prompt-box .ProseMirror[contenteditable=true], .ProseMirror[contenteditable=true]")].filter(v); if(a.length) return a[0]; const c=[...document.querySelectorAll("textarea,[contenteditable=true],[role=textbox]")].filter(e=>v(e)&&!e.disabled&&!/search|поиск|пошук/i.test((e.placeholder||"")+(e.getAttribute("aria-label")||""))); return c.length?c[c.length-1]:null;})()';
+  const FLOW_GO = '(()=>{const q=s=>[...document.querySelectorAll(s)].find(b=>b.offsetParent!==null); return q(\'button[aria-label="Start generation"]\')||q(\'button[aria-label*="generation" i]\')||q(\'button[aria-label*="генерац" i]\')||q(\'flow-prompt-box button:has(mat-icon[fonticon="arrow_forward"])\')||q(\'button:has(mat-icon[fonticon="arrow_forward"])\')||q(\'flow-prompt-box button.btn-primary\')||null;})()';
+  const FLOW_IMGS = '[...document.querySelectorAll("img[data-media-id]")].filter(i=>i.complete&&i.naturalWidth>0).map(i=>"mid:"+i.dataset.mediaId)';
+  const FLOW_ALL_IDS = '[...document.querySelectorAll("img[data-media-id]")].map(i=>"mid:"+i.dataset.mediaId)';
+  const FLOW_IS_PROJECT = '(()=>{const v=e=>e&&e.offsetParent!==null; if([...document.querySelectorAll("flow-prompt-box, .ProseMirror[contenteditable=true]")].some(v)) return true; const home=[...document.querySelectorAll("button,a,[role=button]")].some(b=>v(b)&&/^\\s*(\\+\\s*)?(новый проект|new project|start creating|try omni)/i.test(b.innerText||"")); return !home && [...document.querySelectorAll("textarea,[contenteditable=true],[role=textbox]")].some(v);})()';
   function flowText(p){ const m = String(p).match(/^(Hand-drawn[\s\S]*?no watermark\.)\s+([\s\S]+)$/); return m ? m[2]+' '+m[1] : String(p); }
-  function flowWords(list){
-    const toks = list.map(p => new Set((flowText(p).split(/no watermark\./)[0].toLowerCase().match(/[a-z]{4,}/g) || [])));
-    return toks.map((set, i) => [...set].filter(w => toks.every((o, j) => j === i || !o.has(w))).slice(0, 14));
-  }
-  const FLOW_IMGS = 'Array.from(document.images).filter(i=>i.complete&&i.naturalWidth>=256&&i.offsetParent!==null).map(i=>{const s=i.currentSrc||i.src||"";return s.length>300?s.slice(0,200)+"#"+s.length:s;})';
-  const FLOW_BOX = '(()=>{const vis=e=>e.offsetParent!==null&&!e.disabled; const c=[...document.querySelectorAll("textarea"),...document.querySelectorAll("[contenteditable=true],[role=textbox]")].filter(vis).filter(e=>!/search|поиск|пошук/i.test((e.placeholder||"")+(e.getAttribute("aria-label")||""))); const hint=e=>/создать|create|створити|prompt|промпт/i.test((e.placeholder||"")+(e.getAttribute("aria-label")||"")+(e.getAttribute("data-placeholder")||"")+(e.innerText||"").slice(0,60)); const p=c.filter(hint); const r=p.length?p:c; r.sort((x,y)=>x.getBoundingClientRect().left-y.getBoundingClientRect().left); return r.length?r[r.length-1]:null;})()';
-  // the Flow start page also has a prompt box, and typing there creates a NEW project; so check the page itself, not only the address
-  const FLOW_IS_PROJECT = '(()=>{const vis=e=>e&&e.offsetParent!==null; const home=[...document.querySelectorAll("button,a,[role=button]")].some(b=>vis(b)&&/^\\s*(\\+\\s*)?(новый проект|new project|start creating|try omni)/i.test(b.innerText||"")); const box=[...document.querySelectorAll("textarea,[contenteditable=true],[role=textbox]")].some(vis); return box && !home;})()';
+  const flowKey = t => String(t||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
   async function flowEnsureProject(){
     const cdp = G.cdp, sid = G.sid;
     let url = await gEval('location.href').catch(() => '') || '';
     const inProject = async () => !!(await gEval(FLOW_IS_PROJECT).catch(() => false));
     if(!(await inProject())){
-      if(G.flowProj && G.flowProj !== url){ glog('  Flow ушёл со страницы проекта, возвращаюсь в проект'); await cdp.send('Page.navigate', {url: G.flowProj}, sid); await gsleep(7000); url = await gEval('location.href').catch(() => '') || ''; }
-      if(!(await inProject())) throw new Error('Сейчас в окне Flow открыта главная страница, а не проект. Откройте проект (свой или «Новый проект») в окне Chrome от AutoCut, дождитесь чата справа и нажмите «Старт». Адрес: '+String(url).slice(0,90));
+      if(G.flowProj && G.flowProj !== url){ glog('  Flow ушёл со страницы проекта, возвращаюсь в проект'); await cdp.send('Page.navigate', {url: G.flowProj}, sid); await gsleep(8000); url = await gEval('location.href').catch(() => '') || ''; }
+      if(!(await inProject())) throw new Error('В окне Flow открыта не страница проекта. Откройте проект (свой или «Новый проект») в окне Chrome от AutoCut, дождитесь поля для промта внизу и нажмите «Старт». Адрес: '+String(url).slice(0,90));
     }
     G.flowProj = url.split('#')[0];
+    if(G.flowSetFor !== G.sid){ G.flowSetFor = G.sid; await flowSetup(); }
+  }
+  // once per connection: Agent chat off (prompts go into the plain prompt box), picture mode, 1 picture per prompt
+  async function flowSetup(){
+    const r = await gEval(`(async()=>{const sl=ms=>new Promise(r=>setTimeout(r,ms)); const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)]; const out=[];
+      const ag=$("button.agent-mode-chip"); if(ag&&ag.getAttribute("aria-pressed")==="true"){ ag.click(); await sl(600); out.push("режим Agent выключен"); }
+      const panel=()=>$("flow-prompt-box-settings")||$('[class*="prompt-box-settings"]');
+      const trig=()=>$('button[aria-label="Settings trigger"]')||$('button[aria-label*="settings" i]')||$('button[aria-label*="настройк" i]')||$("button:has(.settings-summary)")||$('flow-prompt-box button:has(mat-icon[fonticon="tune"])');
+      const group=names=>{for(const g of $$("flow-toggles")){const a=(g.getAttribute("aria-label")||"").toLowerCase(); if(names.some(n=>a.includes(n))) return $$('button[role="radio"]',g);} return [];};
+      const pick=async(names,want,label)=>{const bs=group(names); const t=b=>(($(".toggle-text",b)||b).textContent||"").trim().toLowerCase(); const b=bs.find(b=>want.includes(t(b))); if(!b) return; if(b.getAttribute("aria-checked")!=="true"){ b.click(); await sl(400); out.push(label); }};
+      try{ if(!panel()){ const t=trig(); if(t){ t.click(); await sl(900);} }
+        if(panel()){ await pick(["mode","режим","тип"],["image","изображение","картинка"],"режим: картинки"); await sl(300);
+          await pick(["aspect","соотношение","формат"],["16:9"],"формат 16:9");
+          await pick(["output","количество","вариант"],["x1","1"],"1 картинка на промт");
+          const t=trig(); if(t&&panel()){ t.click(); await sl(500);} if(panel()) document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true})); }
+      }catch(e){ out.push("настройки: "+e.message); }
+      return out.join(", ");})()`).catch(e => 'не удалось: '+e.message);
+    if(r) glog('  Flow: '+r);
+  }
+  // real mouse click, like a person: Flow ignores synthetic clicks on some buttons
+  async function flowClick(x, y){
+    const cdp = G.cdp, sid = G.sid;
+    await cdp.send('Input.dispatchMouseEvent', {type:'mouseMoved', x, y}, sid); await gsleep(80);
+    await cdp.send('Input.dispatchMouseEvent', {type:'mousePressed', x, y, button:'left', clickCount:1}, sid); await gsleep(80);
+    await cdp.send('Input.dispatchMouseEvent', {type:'mouseReleased', x, y, button:'left', clickCount:1}, sid);
   }
   async function flowSend(prompt, dead){
-    const cdp = G.cdp, sid = G.sid, box = FLOW_BOX;
+    const cdp = G.cdp, sid = G.sid, text = flowText(prompt);
     let ok = false, t0 = Date.now();
     while(Date.now()-t0 < 30000 && !dead()){
-      ok = await gEval('(()=>{const e='+box+'; if(!e) return false; e.focus(); if(e.tagName==="TEXTAREA"){ const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set; set.call(e,""); e.dispatchEvent(new Event("input",{bubbles:true})); } else { document.execCommand("selectAll",false,null); document.execCommand("delete",false,null); } return true;})()').catch(() => false);
+      ok = await gEval('(()=>{const e='+FLOW_ED+'; if(!e) return false; e.focus(); if(e.tagName==="TEXTAREA"){ const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set; set.call(e,""); e.dispatchEvent(new Event("input",{bubbles:true})); } else { document.execCommand("selectAll",false,null); document.execCommand("delete",false,null); } return true;})()').catch(() => false);
       if(ok) break; await gsleep(800);
     }
     if(dead()) throw new Error('stopped');
     if(!ok) throw new Error('Не найдено поле для промта в Flow. Откройте проект Flow и войдите в аккаунт');
-    await gsleep(400);
-    await cdp.send('Input.insertText', {text: flowText(prompt)}, sid); await gsleep(800);
-    const left = () => gEval('(()=>{const e='+box+'; return e ? ((e.tagName==="TEXTAREA"?e.value:e.innerText)||"").trim().length : 0;})()').catch(() => 0);
-    const clickGo = () => gEval('(()=>{const e='+box+'; if(!e) return false; const re=/arrow_forward|send|submit|generate|отправ|сгенер|надісл|згенер/i, bad=/stop|cancel|отмен|скас|micro|голос|voice|upload|загруз|attach|settings|настро|налашт|add|добав|back|назад|home|project|проект/i; let p=e; for(let d=0; d<6 && p; d++){ p=p.parentElement; if(!p) break; const bs=[...p.querySelectorAll("button,[role=button]")].filter(b=>b.offsetParent!==null&&!b.disabled&&b.getAttribute("aria-disabled")!=="true"&&!b.closest("a")); for(const b of bs.reverse()){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("title")||"")+" "+(b.textContent||""); if(re.test(l)&&!bad.test(l)){b.click(); return true;}} } return false;})()').catch(() => false);
-    const pressEnter = async () => { for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid); };
-    await pressEnter();
-    for(let i = 0; i < 4 && !dead(); i++){
-      await gsleep(2500);
-      if(!(await left())) return true;
-      if(!(await clickGo())) await pressEnter();
+    await gsleep(300);
+    const typed = await gEval('(()=>{const e='+FLOW_ED+'; if(!e) return false; e.focus(); if(e.tagName==="TEXTAREA") return false; return document.execCommand("insertText",false,'+JSON.stringify(text)+');})()').catch(() => false);
+    if(!typed) await cdp.send('Input.insertText', {text}, sid);
+    await gsleep(700);
+    const inBox = async () => flowKey(await gEval('(()=>{const e='+FLOW_ED+'; return e ? (e.tagName==="TEXTAREA"?e.value:e.textContent)||"" : "";})()').catch(() => '') || '');
+    const want = flowKey(text);
+    const have = await inBox();
+    if(have !== want && !(have.length > 40 && want.startsWith(have.slice(0, 40)))) throw new Error('текст в поле Flow не совпал с промтом');
+    for(let i = 0; i < 3 && !dead(); i++){
+      let r = null, tb = Date.now();
+      while(Date.now()-tb < 8000 && !dead()){
+        r = await gEval('(()=>{const b='+FLOW_GO+'; if(!b||b.disabled||b.getAttribute("aria-disabled")==="true") return null; const q=b.getBoundingClientRect(); return {x:Math.round(q.left+q.width/2), y:Math.round(q.top+q.height/2)};})()').catch(() => null);
+        if(r) break; await gsleep(300);
+      }
+      if(r){ await gsleep(300); await flowClick(r.x, r.y); }
+      else for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid);
+      const ts = Date.now();
+      while(Date.now()-ts < 8000 && !dead()){
+        await gsleep(500);
+        if(!(await inBox())) return true;
+        if(await gEval('(()=>{const b='+FLOW_GO+'; return !!(b&&b.disabled) || document.querySelectorAll(".loading-percentage").length>0;})()').catch(() => false)) return true;
+      }
     }
     return false;
   }
   async function flowSave(key, name){
     const cdp = G.cdp, sid = G.sid;
-    const findImg = '(()=>{const k='+JSON.stringify(key)+'; return Array.from(document.images).find(i=>{const s=i.currentSrc||i.src||""; return (s.length>300?s.slice(0,200)+"#"+s.length:s)===k;})||null;})()';
+    const findImg = '(()=>{const k='+JSON.stringify(key)+'; if(k.startsWith("mid:")) return [...document.querySelectorAll("img[data-media-id]")].find(i=>"mid:"+i.dataset.mediaId===k)||null; return Array.from(document.images).find(i=>{const s=i.currentSrc||i.src||""; return (s.length>300?s.slice(0,200)+"#"+s.length:s)===k;})||null;})()';
     let b64 = await gEval('(async()=>{const i='+findImg+'; if(!i) return null; try{ const r=await fetch(i.currentSrc||i.src,{credentials:"include"}); const bl=await r.blob(); const bm=await createImageBitmap(bl); const c=document.createElement("canvas"); c.width=bm.width; c.height=bm.height; c.getContext("2d").drawImage(bm,0,0); return c.toDataURL("image/png").split(",")[1]; }catch(e){ try{ const c=document.createElement("canvas"); c.width=i.naturalWidth; c.height=i.naturalHeight; c.getContext("2d").drawImage(i,0,0); return c.toDataURL("image/png").split(",")[1]; }catch(e2){ return null; } } })()').catch(() => null);
     if(!b64){
       const r = await gEval('(()=>{const i='+findImg+'; if(!i) return null; i.scrollIntoView({block:"center"}); const b=i.getBoundingClientRect(); return {x:b.left,y:b.top,w:b.width,h:b.height,nw:i.naturalWidth};})()').catch(() => null);
@@ -1940,51 +1976,54 @@
     const w = await NATIVE.writeFile(G.dir, name, b64);
     if(!w || !w.ok) throw new Error((w && w.error) || 'не удалось записать файл');
   }
-  // several prompts at once: every new picture is matched to its scene by the prompt text Flow shows next to it; unmatched pictures are never saved
+  // several prompts at once: each new picture is matched to its scene by the prompt text Flow writes on its tile; unmatched pictures are never saved
   async function genFlowBatch(nums, prompts, tok){
     const dead = () => tok !== G.tok;
     await flowEnsureProject();
-    const before = new Set(await gEval(FLOW_IMGS).catch(() => []) || []);
-    const list = nums.map(n => prompts[n-1]), words = flowWords(list);
-    const P = nums.map((n, i) => ({n, words: words[i]})).filter(p => p.words.length >= 3);
-    if(P.length < nums.length) glog('  у некоторых сцен слишком похожие промты, они пойдут по одной');
+    const before = new Set(await gEval(FLOW_ALL_IDS).catch(() => []) || []);
+    const P = [];
+    for(const n of nums){
+      if(dead()) break; glog('  отправляю сцену '+n);
+      const ok = await flowSend(prompts[n-1], dead).catch(e => { glog('  сцена '+n+': '+e.message); return false; });
+      if(ok) P.push({n, key: flowKey(flowText(prompts[n-1]))}); else glog('  сцена '+n+': Flow не принял промт, сделаю её позже');
+      await gsleep(2500);
+    }
     if(!P.length) return new Set();
-    for(const p of P){ if(dead()) break; glog('  отправляю сцену '+p.n); const ok = await flowSend(prompts[p.n-1], dead); if(!ok) glog('  сцена '+p.n+': текст остался в поле'); await gsleep(1500); }
-    const pending = new Map(P.map(p => [p.n, null])), saved = new Set(), used = new Set(); let unmatched = 0;
-    const matchJs = () => '(()=>{const P='+JSON.stringify([...pending.keys()].map(n => P.find(p => p.n === n)))+', before=new Set('+JSON.stringify([...before, ...used])+'); const key=i=>{const s=i.currentSrc||i.src||"";return s.length>300?s.slice(0,200)+"#"+s.length:s;}; const out=[]; for(const i of document.images){ if(!(i.complete&&i.naturalWidth>=256&&i.offsetParent!==null)) continue; const k=key(i); if(before.has(k)) continue; let a=i, best=null; for(let d=0; d<10 && a; d++){ a=a.parentElement; if(!a) break; const t=(a.innerText||"").toLowerCase(); if(t.length<20) continue; if(t.length>20000) break; const sc=P.map(p=>({n:p.n,s:p.words.filter(w=>t.includes(w)).length})).sort((x,y)=>y.s-x.s); if(!sc.length) break; if(sc[0].s>=3 && (sc.length<2 || sc[0].s>=sc[1].s+2)){ best=sc[0].n; break; } if(sc.length>1 && sc[0].s>0 && sc[0].s===sc[1].s) break; } out.push({k, n:best}); } return out; })()';
+    const pending = new Map(P.map(p => [p.n, p.key])), saved = new Set(), used = new Set(); let unmatched = 0;
+    const matchJs = () => '(()=>{const P='+JSON.stringify([...pending].map(([n,k]) => ({n,k})))+', skip=new Set('+JSON.stringify([...before, ...used])+'); const key=t=>(t||"").toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu,""); const fit=(a,b)=>a&&b&&(a===b||(Math.min(a.length,b.length)>=24&&(a.startsWith(b)||b.startsWith(a)))); const out=[]; for(const i of document.querySelectorAll("img[data-media-id]")){ if(!(i.complete&&i.naturalWidth>0)) continue; const k="mid:"+i.dataset.mediaId; if(skip.has(k)) continue; let el=i.parentElement, n=null; for(let d=0; d<8 && el && el!==document.body && n==null; d++, el=el.parentElement){ for(const s of el.querySelectorAll(".subtitle,[class*=subtitle],[class*=prompt],[class*=caption],p")){ const t=key(s.textContent); if(t.length<10) continue; const h=P.filter(p=>fit(p.k,t)||(t.length>=20&&p.k.includes(t.slice(0,30)))); if(h.length===1){ n=h[0].n; break; } } if(el.querySelectorAll("img[data-media-id]").length>1) break; } out.push({k, n}); } return out; })()';
     const deadline = Date.now() + GEN.waitImage + 30000*(P.length-1);
     while(pending.size && Date.now() < deadline && !dead()){
       await gsleep(2500);
       const found = await gEval(matchJs()).catch(() => []) || [];
+      // only one scene left and exactly one unknown new picture: it is that scene's
+      if(pending.size === 1 && found.length === 1 && found[0].n == null) found[0].n = [...pending.keys()][0];
       unmatched = found.filter(f => f.n == null).length;
       for(const f of found){
         if(f.n == null || !pending.has(f.n)) continue;
-        if(pending.get(f.n) === f.k){          // the same picture twice in a row: it is finished
-          try{ await flowSave(f.k, imgName(f.n)); saved.add(f.n); used.add(f.k); pending.delete(f.n); glog('  сохранено '+imgName(f.n)+' (по тексту промта)'); }
-          catch(e){ glog('  сцена '+f.n+': '+e.message); pending.delete(f.n); }
-        } else pending.set(f.n, f.k);
+        try{ await flowSave(f.k, imgName(f.n)); saved.add(f.n); glog('  сохранено '+imgName(f.n)); }
+        catch(e){ glog('  сцена '+f.n+': '+e.message); }
+        used.add(f.k); pending.delete(f.n);
       }
     }
     if(dead()) throw new Error('stopped');
-    if(pending.size && unmatched && !saved.size){ G.flowNoBatch = true; glog('  Flow не показывает текст промта рядом с картинками, поэтому сразу несколько промтов не сопоставить. Дальше по одному.'); }
+    if(pending.size && unmatched && !saved.size){ G.flowNoBatch = true; glog('  Flow не подписывает картинки текстом промта, поэтому несколько сразу не сопоставить. Дальше по одной.'); }
     else if(pending.size) glog('  не дождался сцен: '+[...pending.keys()].join(', ')+' (сделаю их в следующем круге)');
     return saved;
   }
   async function genSceneFlow(n, prompt, tok, dstName){
     const dead = () => tok !== G.tok;
     await flowEnsureProject();
-    const before = new Set(await gEval(FLOW_IMGS).catch(() => []) || []);
+    const before = new Set(await gEval(FLOW_ALL_IDS).catch(() => []) || []);
     const sent = await flowSend(prompt, dead);
-    if(!sent) glog('  Flow: текст остался в поле, жду картинку на всякий случай');
-    let pick = null, prev = null, t0 = Date.now();
+    if(!sent) throw new Error('Flow не начал генерацию после нажатия кнопки');
+    let pick = null, t0 = Date.now();
     while(Date.now()-t0 < GEN.waitImage && !dead()){
-      const now = await gEval(FLOW_IMGS).catch(() => []) || [];
-      const fresh = now.filter(k => !before.has(k));
-      if(fresh.length){ if(prev && fresh[0] === prev){ pick = prev; break; } prev = fresh[0]; }
-      await gsleep(2500);
+      await gsleep(1500);
+      const fresh = (await gEval(FLOW_IMGS).catch(() => []) || []).filter(k => !before.has(k));
+      if(fresh.length){ await gsleep(800); pick = fresh[0]; break; }
     }
     if(dead()) throw new Error('stopped');
-    if(!pick) throw new Error('Картинка не появилась в Flow за '+Math.round(GEN.waitImage/1000)+' с (возможно, лимит или Flow в режиме видео)');
+    if(!pick) throw new Error('Картинка не появилась в Flow за '+Math.round(GEN.waitImage/1000)+' с (возможно, лимит)');
     await flowSave(pick, dstName || imgName(n));
   }
   async function genStart(){
