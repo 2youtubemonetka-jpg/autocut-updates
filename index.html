@@ -1874,13 +1874,18 @@
     return toks.map((set, i) => [...set].filter(w => toks.every((o, j) => j === i || !o.has(w))).slice(0, 14));
   }
   const FLOW_IMGS = 'Array.from(document.images).filter(i=>i.complete&&i.naturalWidth>=256&&i.offsetParent!==null).map(i=>{const s=i.currentSrc||i.src||"";return s.length>300?s.slice(0,200)+"#"+s.length:s;})';
-  const FLOW_BOX = '(()=>{const c=[...document.querySelectorAll("textarea"),...document.querySelectorAll("[contenteditable=true],[role=textbox]")].filter(e=>e.offsetParent!==null&&!e.disabled); return c.length?c[c.length-1]:null;})()';
+  const FLOW_BOX = '(()=>{const vis=e=>e.offsetParent!==null&&!e.disabled; const c=[...document.querySelectorAll("textarea"),...document.querySelectorAll("[contenteditable=true],[role=textbox]")].filter(vis).filter(e=>!/search|поиск|пошук/i.test((e.placeholder||"")+(e.getAttribute("aria-label")||""))); const hint=e=>/создать|create|створити|prompt|промпт/i.test((e.placeholder||"")+(e.getAttribute("aria-label")||"")+(e.getAttribute("data-placeholder")||"")+(e.innerText||"").slice(0,60)); const p=c.filter(hint); const r=p.length?p:c; r.sort((x,y)=>x.getBoundingClientRect().left-y.getBoundingClientRect().left); return r.length?r[r.length-1]:null;})()';
+  // the Flow start page also has a prompt box, and typing there creates a NEW project; so check the page itself, not only the address
+  const FLOW_IS_PROJECT = '(()=>{const vis=e=>e&&e.offsetParent!==null; const home=[...document.querySelectorAll("button,a,[role=button]")].some(b=>vis(b)&&/^\\s*(\\+\\s*)?(новый проект|new project|start creating|try omni)/i.test(b.innerText||"")); const box=[...document.querySelectorAll("textarea,[contenteditable=true],[role=textbox]")].some(vis); return box && !home;})()';
   async function flowEnsureProject(){
     const cdp = G.cdp, sid = G.sid;
     let url = await gEval('location.href').catch(() => '') || '';
-    if(isFlowProject(url)) G.flowProj = url.split('#')[0];
-    else if(G.flowProj){ glog('  Flow ушёл со страницы проекта, возвращаюсь в проект'); await cdp.send('Page.navigate', {url: G.flowProj}, sid); await gsleep(6000); url = await gEval('location.href').catch(() => '') || ''; }
-    if(!isFlowProject(url)) throw new Error('Откройте проект Google Flow в окне Chrome, которое открыл AutoCut (нажмите «Новый проект» или откройте свой), и нажмите «Старт» ещё раз. Сейчас открыто: '+String(url).slice(0,90));
+    const inProject = async () => !!(await gEval(FLOW_IS_PROJECT).catch(() => false));
+    if(!(await inProject())){
+      if(G.flowProj && G.flowProj !== url){ glog('  Flow ушёл со страницы проекта, возвращаюсь в проект'); await cdp.send('Page.navigate', {url: G.flowProj}, sid); await gsleep(7000); url = await gEval('location.href').catch(() => '') || ''; }
+      if(!(await inProject())) throw new Error('Сейчас в окне Flow открыта главная страница, а не проект. Откройте проект (свой или «Новый проект») в окне Chrome от AutoCut, дождитесь чата справа и нажмите «Старт». Адрес: '+String(url).slice(0,90));
+    }
+    G.flowProj = url.split('#')[0];
   }
   async function flowSend(prompt, dead){
     const cdp = G.cdp, sid = G.sid, box = FLOW_BOX;
