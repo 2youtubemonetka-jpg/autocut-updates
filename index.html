@@ -1382,7 +1382,7 @@
 </div></div>
 <div class="modal" id="genModal">
   <div class="card" style="width:min(720px,94vw);max-height:92vh;overflow-y:auto">
-    <h2>Генерация картинок в Gemini</h2>
+    <h2>Генерация картинок (Gemini или Google Flow)</h2>
     <details class="how"><summary>Что нужно, чтобы картинки генерировались</summary>
       <ol>
         <li>Браузер Google Chrome или Microsoft Edge и аккаунт Google. Программа открывает окно Gemini и сама вставляет в него промты, вы входите в аккаунт один раз.</li>
@@ -1401,6 +1401,7 @@
       <select id="gDelay" style="width:auto"><option value="2">Короткая</option><option value="5" selected>Обычная</option><option value="12">Долгая</option></select>
     </div>
     <div class="row" style="gap:8px;margin-bottom:8px">
+      <select id="gProv" style="width:auto;margin:0" title="Где генерировать картинки. Обе программы сохраняют в одну папку проекта, готовые номера не повторяются"><option value="gemini">Gemini</option><option value="flow">Google Flow</option></select>
       <button class="btn" id="gLaunch" style="margin:0">Открыть Gemini</button>
       <button class="btn primary" id="gStart" style="margin:0">Старт</button>
       <button class="btn" id="gStop" style="margin:0;display:none">Стоп</button>
@@ -1711,8 +1712,13 @@
     port: 9222, url: (() => { try{ return localStorage.getItem('autocut.genurl') || 'https://gemini.google.com/app'; }catch(e){ return 'https://gemini.google.com/app'; } })(),
     input: ["rich-textarea div[role='textbox']", "div[contenteditable='true'][role='textbox']", "div.ql-editor"],
     dlRe: /download|скачать|завантажити/i,
-    waitImage: (() => { try{ return parseInt(localStorage.getItem('autocut.genwait'),10) || 150000; }catch(e){ return 150000; } })(), waitDownload: 60000, passes: 4
+    waitImage: (() => { try{ return parseInt(localStorage.getItem('autocut.genwait'),10) || 150000; }catch(e){ return 150000; } })(), waitDownload: 60000, passes: 4,
+    flowUrl: 'https://labs.google/fx/tools/flow',
+    prov: (() => { try{ return localStorage.getItem('autocut.genprov') === 'flow' ? 'flow' : 'gemini'; }catch(e){ return 'gemini'; } })()
   };
+  const genUrl = () => GEN.prov === 'flow' ? GEN.flowUrl : GEN.url;
+  const genName = () => GEN.prov === 'flow' ? 'Google Flow' : 'Gemini';
+  const genHost = () => GEN.prov === 'flow' ? /labs\.google/ : /gemini\.google\.com/;
   const gsleep = ms => new Promise(r => setTimeout(r, ms));
   class Cdp {
     constructor(ws){ this.ws = ws; this.id = 0; this.cb = {}; this.ev = []; ws.onmessage = m => { const d = JSON.parse(m.data);
@@ -1780,8 +1786,8 @@
     await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = () => no(new Error('Не удалось подключиться к Chrome')); });
     G.cdp = new Cdp(ws);
     const t = await G.cdp.send('Target.getTargets'); let pg = (t.targetInfos||[]).filter(x => x.type==='page');
-    pg = pg.find(x => /gemini\.google\.com/.test(x.url)) || pg[0];
-    if(!pg){ const c = await G.cdp.send('Target.createTarget', {url: GEN.url}); pg = {targetId: c.targetId}; }
+    pg = pg.find(x => genHost().test(x.url)) || (GEN.prov === 'flow' ? null : pg[0]);
+    if(!pg){ const c = await G.cdp.send('Target.createTarget', {url: genUrl()}); pg = {targetId: c.targetId}; }
     const a = await G.cdp.send('Target.attachToTarget', {targetId: pg.targetId, flatten: true}); G.sid = a.sessionId;
     await G.cdp.send('Page.enable', {}, G.sid); await G.cdp.send('Runtime.enable', {}, G.sid);
     // the page must behave as focused and visible even when another window is on top of it
@@ -1789,6 +1795,7 @@
   }
   const gEval = async expr => { const r = await G.cdp.send('Runtime.evaluate', {expression: expr, returnByValue: true, awaitPromise: true}, G.sid); return r.result ? r.result.value : undefined; };
   async function genScene(n, prompt, tok, dstName){
+    if(GEN.prov === 'flow') return genSceneFlow(n, prompt, tok, dstName);
     const dead = () => tok !== G.tok;
     const cdp = G.cdp, sid = G.sid;
     await cdp.send('Page.navigate', {url: GEN.url}, sid);
@@ -1849,6 +1856,62 @@
     if(await NATIVE.gen.size(src) <= 0) throw new Error('Файл не найден после скачивания');
     const r = await NATIVE.gen.rename(src, dst); if(!r.ok) throw new Error(r.error);
   }
+  /* ---- Google Flow: stay in the open Flow project, type the prompt, wait for a NEW picture, save it as PNG.
+         If Flow makes 2 or 4 pictures per prompt, only the first new one is saved, so the numbering never shifts. ---- */
+  async function genSceneFlow(n, prompt, tok, dstName){
+    const dead = () => tok !== G.tok;
+    const cdp = G.cdp, sid = G.sid;
+    const url = await gEval('location.href').catch(() => '');
+    if(!/labs\.google/.test(url||'')){ await cdp.send('Page.navigate', {url: GEN.flowUrl}, sid); throw new Error('Откройте в окне Chrome проект Google Flow (режим картинок) и нажмите «Старт» ещё раз'); }
+    const imgs = 'Array.from(document.images).filter(i=>i.complete&&i.naturalWidth>=256&&i.offsetParent!==null).map(i=>{const s=i.currentSrc||i.src||"";return s.length>300?s.slice(0,200)+"#"+s.length:s;})';
+    const before = new Set(await gEval(imgs).catch(() => []) || []);
+    // the prompt box: a textarea or an editable field; clear what is left from the previous scene
+    const box = '(()=>{const c=[...document.querySelectorAll("textarea"),...document.querySelectorAll("[contenteditable=true],[role=textbox]")].filter(e=>e.offsetParent!==null&&!e.disabled); return c.length?c[c.length-1]:null;})()';
+    let ok = false, t0 = Date.now();
+    while(Date.now()-t0 < 30000 && !dead()){
+      ok = await gEval('(()=>{const e='+box+'; if(!e) return false; e.focus(); if("value" in e && e.tagName==="TEXTAREA"){ const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set; set.call(e,""); e.dispatchEvent(new Event("input",{bubbles:true})); } else { document.execCommand("selectAll",false,null); document.execCommand("delete",false,null); } return true;})()').catch(() => false);
+      if(ok) break; await gsleep(800);
+    }
+    if(dead()) throw new Error('stopped');
+    if(!ok) throw new Error('Не найдено поле для промта в Flow. Откройте проект Flow и войдите в аккаунт');
+    await gsleep(500);
+    await cdp.send('Input.insertText', {text: prompt}, sid); await gsleep(900);
+    const left = () => gEval('(()=>{const e='+box+'; return e ? ((e.value!==undefined&&e.tagName==="TEXTAREA"?e.value:e.innerText)||"").trim().length : 0;})()').catch(() => 0);
+    const clickGo = () => gEval('(()=>{const re=/create|generate|send|submit|arrow_forward|создать|сгенер|отправ|надісл|створ/i, bad=/stop|cancel|отмен|скас|micro|голос|voice|upload|загруз|attach|settings|настро|налашт|add|добав/i; const bs=[...document.querySelectorAll("button,[role=button]")].filter(b=>b.offsetParent!==null&&!b.disabled&&b.getAttribute("aria-disabled")!=="true"); for(const b of bs.reverse()){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("title")||"")+" "+(b.textContent||""); if(re.test(l)&&!bad.test(l)){b.click(); return true;}} return false;})()').catch(() => false);
+    const pressEnter = async () => { for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid); };
+    await pressEnter();
+    let sent = false;
+    for(let i = 0; i < 4 && !dead(); i++){
+      await gsleep(2500);
+      if(!(await left())){ sent = true; break; }
+      if(!(await clickGo())) await pressEnter();
+    }
+    if(dead()) throw new Error('stopped');
+    if(!sent) glog('  Flow: текст остался в поле, жду картинку на всякий случай');
+    // wait for a new picture that stays the same for two checks (Flow shows a blurry preview first)
+    let pick = null, prev = null; t0 = Date.now();
+    while(Date.now()-t0 < GEN.waitImage && !dead()){
+      const now = await gEval(imgs).catch(() => []) || [];
+      const fresh = now.filter(k => !before.has(k));
+      if(fresh.length){ if(prev && fresh[0] === prev){ pick = prev; break; } prev = fresh[0]; }
+      await gsleep(2500);
+    }
+    if(dead()) throw new Error('stopped');
+    if(!pick) throw new Error('Картинка не появилась в Flow за '+Math.round(GEN.waitImage/1000)+' с (возможно, лимит или Flow в режиме видео)');
+    // read the picture inside the page and convert it to PNG; if the page cannot read it, take a sharp screenshot of it
+    const keyJs = JSON.stringify(pick);
+    const findImg = '(()=>{const k='+keyJs+'; return Array.from(document.images).find(i=>{const s=i.currentSrc||i.src||""; return (s.length>300?s.slice(0,200)+"#"+s.length:s)===k;})||null;})()';
+    let b64 = await gEval('(async()=>{const i='+findImg+'; if(!i) return null; try{ const r=await fetch(i.currentSrc||i.src,{credentials:"include"}); const bl=await r.blob(); const bm=await createImageBitmap(bl); const c=document.createElement("canvas"); c.width=bm.width; c.height=bm.height; c.getContext("2d").drawImage(bm,0,0); return c.toDataURL("image/png").split(",")[1]; }catch(e){ try{ const c=document.createElement("canvas"); c.width=i.naturalWidth; c.height=i.naturalHeight; c.getContext("2d").drawImage(i,0,0); return c.toDataURL("image/png").split(",")[1]; }catch(e2){ return null; } } })()').catch(() => null);
+    if(!b64){
+      const r = await gEval('(()=>{const i='+findImg+'; if(!i) return null; i.scrollIntoView({block:"center"}); const b=i.getBoundingClientRect(); return {x:b.left,y:b.top,w:b.width,h:b.height,nw:i.naturalWidth};})()').catch(() => null);
+      if(!r || r.w < 10) throw new Error('Не удалось сохранить картинку из Flow');
+      await gsleep(400);
+      const shot = await cdp.send('Page.captureScreenshot', {format:'png', clip:{x:r.x, y:r.y, width:r.w, height:r.h, scale: Math.max(1, Math.min(4, (r.nw||r.w)/r.w))}, captureBeyondViewport:true}, sid);
+      b64 = shot && shot.data; glog('  Flow не дал скачать оригинал, сохранён снимок картинки');
+    }
+    const w = await NATIVE.writeFile(G.dir, dstName || imgName(n), b64);
+    if(!w || !w.ok) throw new Error((w && w.error) || 'не удалось записать файл');
+  }
   async function genStart(){
     if(G.run) return;
     const prompts = parsePrompts($('gPrompts').value); if(!prompts.length){ toast('Вставьте промты'); return; }
@@ -1904,7 +1967,11 @@
     };
     $('gPrompts').oninput = async e => { const old = S.gen.text || '', nw = $('gPrompts').value; S.gen.text = nw; touch(); if(e && e.inputType === 'insertFromPaste' && nw.length > 500) await setChanged(old, nw); genStat(); };
     $('gFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; const old = S.gen.text || ''; $('gPrompts').value = await f.text(); S.gen.text = $('gPrompts').value; touch(); await setChanged(old, S.gen.text); genStat(); };
-    $('gLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:GEN.url}); glog(r.ok ? 'Chrome запущен. Войдите в Google, если нужно, и нажмите «Старт».' : 'Ошибка: '+r.error); };
+    const provUi = () => { $('gProv').value = GEN.prov; $('gLaunch').textContent = 'Открыть '+genName(); };
+    provUi();
+    $('gProv').onchange = e => { GEN.prov = e.target.value === 'flow' ? 'flow' : 'gemini'; try{ localStorage.setItem('autocut.genprov', GEN.prov); }catch(_){} try{ if(G.cdp) G.cdp.ws.close(); }catch(_){} G.cdp = null; provUi();
+      glog(GEN.prov === 'flow' ? 'Выбран Google Flow. Откройте его кнопкой, создайте проект в режиме картинок и нажмите «Старт». Готовые картинки из Gemini уже учтены.' : 'Выбран Gemini. Готовые картинки из Flow уже учтены.'); };
+    $('gLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:genUrl()}); glog(r.ok ? 'Chrome запущен. Войдите в Google, если нужно'+(GEN.prov === 'flow' ? ', откройте проект Flow' : '')+', и нажмите «Старт».' : 'Ошибка: '+r.error); };
     $('gMissCopy').onclick = async () => { const pr = parsePrompts($('gPrompts').value), d = await doneSet(); const txt = pr.map((p,i) => d.has(i+1) ? null : (i+1)+'. '+p).filter(Boolean).join('\n\n'); try{ await navigator.clipboard.writeText(txt); toast('Промты скопированы'); }catch(e){ $('gPrompts').value = txt; toast('Не удалось скопировать, промты показаны в поле'); } };
     $('gStart').onclick = genStart; $('gStop').onclick = () => { G.tok++; G.stop = true; try{ if(G.cdp) G.cdp.ws.close(); }catch(e){} G.cdp = null; G.run = false; $('gStart').style.display = ''; $('gStop').style.display = 'none'; glog('Остановлено. Сделанные картинки сохранены, «Старт» продолжит с места остановки.'); genStat(); };
     $('gUse').onclick = genUse; $('gClose').onclick = () => $('genModal').classList.remove('on');
@@ -3681,7 +3748,7 @@
     if(NATIVE.gen){ $('edRegen').style.display = ''; $('edRegen').onclick = openRegen; }
     $('rgGo').onclick = rgGo;
     $('rgStop').onclick = () => { G.tok++; RG.busy = false; G.run = false; $('rgGo').disabled = false; $('rgStop').style.display = 'none'; rgMsg('Остановлено.'); };
-    $('rgLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:GEN.url}); rgMsg(r.ok ? 'Окно Gemini открывается. Войдите в Google, если нужно, и нажмите «Сгенерировать».' : 'Ошибка: '+r.error); };
+    $('rgLaunch').onclick = async () => { const r = await NATIVE.gen.launch({port:GEN.port, url:genUrl()}); rgMsg(r.ok ? 'Окно Gemini открывается. Войдите в Google, если нужно, и нажмите «Сгенерировать».' : 'Ошибка: '+r.error); };
     $('rgClose').onclick = () => closeModal($('rgModal'));
     $('bkOpen').style.display = '';
     $('bkOpen').onclick = () => { if(!V4){ toast('Для резервных копий нужна новая версия программы: скачайте и установите свежий AutoCut-Setup.exe'); return; } if(activeId) saveProject(activeId); $('bkWrap').style.display = 'none'; bkMsg(''); $('bkModal').classList.add('on'); };
