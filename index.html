@@ -1787,7 +1787,7 @@
     await new Promise((ok, no) => { ws.onopen = ok; ws.onerror = () => no(new Error('Не удалось подключиться к Chrome')); });
     G.cdp = new Cdp(ws);
     const t = await G.cdp.send('Target.getTargets'); let pg = (t.targetInfos||[]).filter(x => x.type==='page');
-    pg = pg.find(x => genHost().test(x.url)) || (GEN.prov === 'flow' ? null : pg[0]);
+    pg = (GEN.prov === 'flow' ? pg.find(x => /labs\.google.*\/project\//.test(x.url)) : null) || pg.find(x => genHost().test(x.url)) || (GEN.prov === 'flow' ? null : pg[0]);
     if(!pg){ const c = await G.cdp.send('Target.createTarget', {url: genUrl()}); pg = {targetId: c.targetId}; }
     const a = await G.cdp.send('Target.attachToTarget', {targetId: pg.targetId, flatten: true}); G.sid = a.sessionId;
     await G.cdp.send('Page.enable', {}, G.sid); await G.cdp.send('Runtime.enable', {}, G.sid);
@@ -1862,8 +1862,10 @@
   async function genSceneFlow(n, prompt, tok, dstName){
     const dead = () => tok !== G.tok;
     const cdp = G.cdp, sid = G.sid;
-    const url = await gEval('location.href').catch(() => '');
-    if(!/labs\.google/.test(url||'')){ await cdp.send('Page.navigate', {url: GEN.flowUrl}, sid); throw new Error('Откройте в окне Chrome проект Google Flow (режим картинок) и нажмите «Старт» ещё раз'); }
+    let url = await gEval('location.href').catch(() => '') || '';
+    if(/labs\.google.*\/project\//.test(url)) G.flowProj = url.split('#')[0];
+    else if(G.flowProj){ glog('  Flow ушёл со страницы проекта, возвращаюсь в проект'); await cdp.send('Page.navigate', {url: G.flowProj}, sid); await gsleep(6000); url = await gEval('location.href').catch(() => '') || ''; }
+    if(!/labs\.google.*\/project\//.test(url)) throw new Error('Откройте в окне Chrome проект Google Flow (нажмите «Новый проект» или откройте свой) и нажмите «Старт» ещё раз. Сейчас открыто: '+String(url).slice(0,90));
     const imgs = 'Array.from(document.images).filter(i=>i.complete&&i.naturalWidth>=256&&i.offsetParent!==null).map(i=>{const s=i.currentSrc||i.src||"";return s.length>300?s.slice(0,200)+"#"+s.length:s;})';
     const before = new Set(await gEval(imgs).catch(() => []) || []);
     // the prompt box: a textarea or an editable field; clear what is left from the previous scene
@@ -1878,7 +1880,7 @@
     await gsleep(500);
     await cdp.send('Input.insertText', {text: prompt}, sid); await gsleep(900);
     const left = () => gEval('(()=>{const e='+box+'; return e ? ((e.value!==undefined&&e.tagName==="TEXTAREA"?e.value:e.innerText)||"").trim().length : 0;})()').catch(() => 0);
-    const clickGo = () => gEval('(()=>{const re=/create|generate|send|submit|arrow_forward|создать|сгенер|отправ|надісл|створ/i, bad=/stop|cancel|отмен|скас|micro|голос|voice|upload|загруз|attach|settings|настро|налашт|add|добав/i; const bs=[...document.querySelectorAll("button,[role=button]")].filter(b=>b.offsetParent!==null&&!b.disabled&&b.getAttribute("aria-disabled")!=="true"); for(const b of bs.reverse()){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("title")||"")+" "+(b.textContent||""); if(re.test(l)&&!bad.test(l)){b.click(); return true;}} return false;})()').catch(() => false);
+    const clickGo = () => gEval('(()=>{const e='+box+'; if(!e) return false; const re=/arrow_forward|send|submit|generate|отправ|сгенер|надісл|згенер/i, bad=/stop|cancel|отмен|скас|micro|голос|voice|upload|загруз|attach|settings|настро|налашт|add|добав|back|назад|home|project|проект/i; let p=e; for(let d=0; d<6 && p; d++){ p=p.parentElement; if(!p) break; const bs=[...p.querySelectorAll("button,[role=button]")].filter(b=>b.offsetParent!==null&&!b.disabled&&b.getAttribute("aria-disabled")!=="true"&&!b.closest("a")); for(const b of bs.reverse()){const l=(b.getAttribute("aria-label")||"")+" "+(b.getAttribute("title")||"")+" "+(b.textContent||""); if(re.test(l)&&!bad.test(l)){b.click(); return true;}} } return false;})()').catch(() => false);
     const pressEnter = async () => { for(const type of ['keyDown','keyUp']) await cdp.send('Input.dispatchKeyEvent', {type, key:'Enter', code:'Enter', windowsVirtualKeyCode:13, nativeVirtualKeyCode:13, text: type==='keyDown' ? '\r' : undefined}, sid); };
     await pressEnter();
     let sent = false;
