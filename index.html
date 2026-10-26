@@ -1791,10 +1791,27 @@
     G.cdp = new Cdp(ws);
     const t = await G.cdp.send('Target.getTargets'); let pg = (t.targetInfos||[]).filter(x => x.type==='page');
     if(GEN.prov === 'flow'){
-      const flows = pg.filter(x => /labs\.google/.test(x.url));
-      pg = flows.find(x => isFlowProject(x.url)) || flows[0];
-      if(!pg){ try{ G.cdp.ws.close(); }catch(_){} G.cdp = null;
-        throw new Error('В окне Chrome от AutoCut не открыт Google Flow. Нажмите «Открыть Google Flow» здесь, в программе, и откройте проект именно в этом окне (не в своём обычном браузере)'); }
+      const all = pg;
+      const flows = all.filter(x => /labs\.google|flow/i.test(x.url||''));
+      pg = flows.find(x => isFlowProject(x.url)) || null;
+      // the address may not look like a project: ask every open tab whether it shows a Flow project with the chat
+      if(!pg){
+        for(const x of [...flows, ...all.filter(y => !flows.includes(y))]){
+          try{
+            const a = await G.cdp.send('Target.attachToTarget', {targetId: x.targetId, flatten: true});
+            const r = await G.cdp.send('Runtime.evaluate', {expression: FLOW_IS_PROJECT, returnByValue: true}, a.sessionId);
+            await G.cdp.send('Target.detachFromTarget', {sessionId: a.sessionId}).catch(() => {});
+            if(r && r.result && r.result.value){ pg = x; break; }
+          }catch(_){}
+        }
+      }
+      if(!pg) pg = flows[0];
+      if(!pg){
+        const urls = all.map(x => String(x.url).slice(0,60)).join(' | ') || 'нет вкладок';
+        try{ await G.cdp.send('Target.createTarget', {url: GEN.flowUrl}); }catch(_){}
+        try{ G.cdp.ws.close(); }catch(_){} G.cdp = null;
+        throw new Error('В окне Chrome от AutoCut нет вкладки Google Flow. Я открыл Flow в новой вкладке этого окна: откройте там проект, дождитесь чата справа и нажмите «Старт». Сейчас открыто: '+urls);
+      }
     } else pg = pg.find(x => genHost().test(x.url)) || pg[0];
     if(!pg){ const c = await G.cdp.send('Target.createTarget', {url: genUrl()}); pg = {targetId: c.targetId}; }
     const a = await G.cdp.send('Target.attachToTarget', {targetId: pg.targetId, flatten: true}); G.sid = a.sessionId;
