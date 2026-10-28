@@ -337,9 +337,44 @@ function checkKey(key) {
   if (f[2] !== 'LIFE') { const end = new Date(f[2] + 'T23:59:59'); if (!(end >= new Date())) return { ok: false, reason: 'expired', exp: f[2] }; }
   return { ok: true, exp: f[2], plan: f[3] || 'PRO', id: f[4] || '' };
 }
+/* ---------- free trial: 2 days from the first start on this computer ---------- */
+const TRIAL_MS = 2 * 24 * 3600 * 1000;
+const trialSig = (st, seen) => licCrypto.createHash('sha256').update('autocut-trial|' + machineCode() + '|' + st + '|' + seen).digest('hex').slice(0, 16);
+const trialFiles = () => [path.join(licDir(), 'trial.dat'), path.join(os.homedir(), '.autocut_t')];
+const TRIAL_REG = 'HKCU\\Software\\AutoCutT';
+function trialRead() {
+  const recs = [];
+  const parse = v => { const f = String(v || '').trim().split('|'); if (f.length === 3 && trialSig(f[0], f[1]) === f[2]) recs.push({ start: +f[0], seen: +f[1] }); else if (String(v || '').trim()) recs.push({ start: 0, seen: 0, bad: true }); };
+  for (const f of trialFiles()) { try { parse(fs.readFileSync(f, 'utf8')); } catch (_) {} }
+  if (process.platform === 'win32') {
+    try { const out = require('child_process').execSync('reg query "' + TRIAL_REG + '" /v t', { windowsHide: true, encoding: 'utf8', timeout: 5000 }); const m = out.match(/\bt\s+REG_SZ\s+(\S+)/); if (m) parse(m[1]); } catch (_) {}
+  }
+  return recs;
+}
+function trialWrite(start, seen) {
+  const v = start + '|' + seen + '|' + trialSig(start, seen);
+  for (const f of trialFiles()) { try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, v); } catch (_) {} }
+  if (process.platform === 'win32') { try { require('child_process').execSync('reg add "' + TRIAL_REG + '" /v t /t REG_SZ /d "' + v + '" /f', { windowsHide: true, timeout: 5000 }); } catch (_) {} }
+}
+function trialStatus() {
+  const now = Date.now(), recs = trialRead();
+  if (recs.some(r => r.bad)) return { ok: false, reason: 'trial_over' };            // edited by hand
+  let start = recs.length ? Math.min(...recs.map(r => r.start)) : 0, seen = recs.length ? Math.max(...recs.map(r => r.seen)) : 0;
+  if (!start) { start = now; seen = now; }
+  if (now < seen - 10 * 60000) { trialWrite(start, seen); return { ok: false, reason: 'trial_over' }; }   // clock moved back
+  seen = Math.max(seen, now); trialWrite(start, seen);
+  const end = start + TRIAL_MS;
+  if (now >= end) return { ok: false, reason: 'trial_over' };
+  return { ok: true, trial: true, plan: 'TRIAL', exp: new Date(end).toISOString(), leftMs: end - now };
+}
 function licenseStatus() {
   let key = ''; try { key = fs.readFileSync(licFile(), 'utf8').trim(); } catch (_) {}
-  const st = checkKey(key); st.machine = machineCode(); st.hasKey = !!key; return st;
+  const st = checkKey(key); st.machine = machineCode(); st.hasKey = !!key;
+  if (st.ok) return st;
+  let tr = { ok: false, reason: 'trial_over' }; try { tr = trialStatus(); } catch (_) {}
+  if (tr.ok) return Object.assign(tr, { machine: st.machine, hasKey: st.hasKey, keyReason: st.reason });
+  if (st.reason === 'none') st.reason = 'trial_over';
+  st.trialOver = true; return st;
 }
 function licenseQuery(o) {
   if (o && typeof o.setKey === 'string') {
@@ -590,4 +625,4 @@ function filmChain(film, flash, W, H) {
 }
 function hasFilm(film, fr) { return !!film && (film.shake > 0 || film.grain > 0 || film.vig > 0 || (film.tone && film.tone !== 'none') || (film.flash && fr.some(f => f.flash != null && f.flash !== false))); }
 
-module.exports = { renderVideo, buildConcat, ffmpegPath, fitFrames, fxFilter, buildSrt, checkKey, machineCode, licenseStatus };
+module.exports = { trialStatus, renderVideo, buildConcat, ffmpegPath, fitFrames, fxFilter, buildSrt, checkKey, machineCode, licenseStatus };

@@ -2816,7 +2816,9 @@
 
   /* ---- AutoCut Pro license: the check itself lives in render.js (main process); here only the window ---- */
   let PRO = null;
-  const LC_WHY = {none:'', format:'Это не похоже на ключ AutoCut. Скопируйте ключ целиком.', signature:'Ключ неверный. Скопируйте его целиком, без лишних символов.', machine:'Этот ключ выдан для другого компьютера. Отправьте продавцу код этого компьютера.', expired:'Срок ключа закончился. Продлите Pro у продавца.'};
+  const LC_WHY = {none:'', format:'Это не похоже на ключ AutoCut. Скопируйте ключ целиком.', signature:'Ключ неверный. Скопируйте его целиком, без лишних символов.', machine:'Этот ключ выдан для другого компьютера. Отправьте продавцу код этого компьютера.', expired:'Срок ключа закончился. Продлите Pro у продавца.', trial_over:'Пробные 2 дня закончились. Чтобы продолжить, купите ключ: Telegram @hasgulik.'};
+  const trialLeft = L => { const h = Math.max(0, Math.ceil((L.leftMs||0)/3600000)); return h >= 24 ? Math.floor(h/24)+' д '+(h%24)+' ч' : h+' ч'; };
+  let trialToast = false;
   async function lcQuery(setKey){
     if(!(NATIVE && NATIVE.v3)) return null;
     if(progSink || ($('eRender') && $('eRender').disabled)){ lcPaint(); return typeof setKey === 'string' ? null : PRO; }   // a video is being built right now
@@ -2833,13 +2835,22 @@
     window.__licLocked = true;
     $('pgMachine').textContent = (PRO && PRO.machine) || '...';
     if(PRO && PRO.reason === 'expired') $('pgErr').textContent = 'Срок ключа закончился '+PRO.exp+'. Продлите Pro в Telegram @hasgulik.';
+    else if(PRO && PRO.trialOver) $('pgErr').textContent = 'Пробные 2 дня закончились. Чтобы продолжить, купите ключ: Telegram @hasgulik.';
     document.querySelectorAll('.modal.on').forEach(m => m.classList.remove('on'));
     $('proGate').classList.add('on');
   }
   function pgUnlock(){ window.__licLocked = false; $('proGate').classList.remove('on'); $('pgErr').textContent = ''; }
-  function pgApply(){ if(PRO && PRO.ok) pgUnlock(); else pgLock(); }
+  function pgApply(){ if(PRO && PRO.ok){ pgUnlock(); if(PRO.trial && !trialToast){ trialToast = true; toast('Пробный период AutoCut: осталось '+trialLeft(PRO)+'. Купить Pro: Telegram @hasgulik'); } } else pgLock(); }
   function lcPaint(){
-    const L = PRO || {}, pro = !!L.ok, until = L.exp === 'LIFE' ? 'навсегда' : 'до '+L.exp;
+    const L = PRO || {};
+    if(L.ok && L.trial){
+      if($('lcStatus')){ $('lcStatus').textContent = 'Пробный период: осталось '+trialLeft(L)+'. Потом нужен ключ Pro.'; $('lcStatus').style.color = '#f5b942'; }
+      if($('lcMachine')) $('lcMachine').value = L.machine || '...';
+      if($('lcOpen')) $('lcOpen').textContent = 'Пробный: '+trialLeft(L)+' · Купить Pro';
+      if($('lcNote')){ $('lcNote').style.display = ''; $('lcNote').textContent = 'Пробный период: осталось '+trialLeft(L)+'. Все функции открыты. Купить Pro: Telegram @hasgulik.'; }
+      return;
+    }
+    const pro = !!L.ok, until = L.exp === 'LIFE' ? 'навсегда' : 'до '+L.exp;
     if($('lcStatus')){ $('lcStatus').textContent = pro ? 'AutoCut Pro активен '+until : 'Ключ не активирован'+(L.reason === 'expired' ? ' (срок Pro закончился '+L.exp+')' : ''); $('lcStatus').style.color = pro ? '#3ad07a' : ''; }
     if($('lcMachine')) $('lcMachine').value = L.machine || '...';
     if($('lcOpen')) $('lcOpen').textContent = pro ? 'Pro '+until : 'Активировать Pro';
