@@ -2787,7 +2787,7 @@
   }
   function jsonData(){
     const d = durations();
-    return {audio:S.audioName, total:S.dur, frames:S.starts.map((s,i)=>({n:i+1,image:S.imgs[i].name,start:+s.toFixed(3),duration:+d[i].toFixed(3),text:S.lines[i]||''}))};
+    return {audio:S.audioName, total:S.dur, frames:S.starts.map((s,i)=>{ const o = {n:i+1,image:S.imgs[i].name,start:+s.toFixed(3),duration:+d[i].toFixed(3),text:S.lines[i]||''}; const wt = metaOf(i).wt; if(Array.isArray(wt) && wt.length) o.words = wt.map(x => +(+x).toFixed(3)); return o; })};
   }
   $('eJson').onclick = () => dl('timeline.json', JSON.stringify(jsonData(),null,2),'application/json');
   $('eCsv').onclick = () => {
