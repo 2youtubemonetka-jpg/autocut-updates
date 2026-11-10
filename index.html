@@ -1636,6 +1636,7 @@
     el.textContent = (S.ovName ? S.ovName+': ' : '')+n+' строк, правил: '+r+'.'+(S.lines.length && S.lines.length !== n ? ' Внимание: в тексте '+S.lines.length+' строк, надписи могут сдвинуться.' : ' Надписи вшиваются вместе с субтитрами.');
   }
   function ovRuleWord(i){ const t = (S.lines[i]||'') + ' ' + S.lines.slice(0, 40).join(' '); return /\bregel\b/i.test(t) ? 'REGEL ' : /\bregla\b/i.test(t) ? 'REGLA ' : /\bregra\b/i.test(t) ? 'REGRA ' : /правил/i.test(t) ? 'ПРАВИЛО ' : /\brègle\b/i.test(t) ? 'RÈGLE ' : 'RULE '; }
+  function ovSide(i){ let n = 0; for(let k = 0; k < i && k < S.ov.length; k++) if(S.ov[k] && S.ov[k].tag) n++; return (n % 2 === 0) ? 'L' : 'R'; }
   function ovRules(){ let m = 0; (S.ov||[]).forEach(o => { if(o && o.rule > m) m = o.rule; }); return m; }
   function ovRuleAt(i){ let m = 0; for(let k = 0; k <= i && k < S.ov.length; k++){ const o = S.ov[k]; if(o && o.rule > m) m = o.rule; } return m; }
   const ovNorm = w => String(w).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -1664,11 +1665,13 @@
         rrect(g, x, 118, tw+60, 82, 14); g.fillStyle = '#d62828'; g.fill(); g.fillStyle = '#ffffff'; g.fillText(t, x+30, 160); }
     }
     // fact plate
-    if(o.tag){ const t = String(o.tag).toUpperCase(); g.font = '800 46px '+FONT; const tw = g.measureText(t).width, x = Math.min(W - tw - 120, W*0.56), y = o.rule ? 250 : 190;
-      g.save(); g.translate(x, y); g.rotate(-0.025); rrect(g, 0, 0, tw+56, 76, 10); g.fillStyle = /^(CA\.|\d)/.test(t) ? '#1f9d55' : 'rgba(20,22,28,.92)'; g.fill(); g.fillStyle = '#ffffff'; g.fillText(t, 28, 40); g.restore(); }
+    if(o.tag){ const t = String(o.tag).toUpperCase(); let fs = 46; g.font = '800 '+fs+'px '+FONT; let tw = g.measureText(t).width;
+      while(tw > W*0.40 && fs > 30){ fs -= 2; g.font = '800 '+fs+'px '+FONT; tw = g.measureText(t).width; }
+      const left = ovSide(i) === 'L', bw = tw+56, x = left ? 44 : W - 44 - bw, y = o.rule ? 232 : 118, rot = left ? 0.02 : -0.02;
+      g.save(); g.translate(x, y); g.rotate(rot); rrect(g, 0, 0, bw, Math.round(fs*1.65), 10); g.fillStyle = /^(CA\.|\d)/.test(t) ? '#1f9d55' : 'rgba(20,22,28,.92)'; g.fill(); g.fillStyle = '#ffffff'; g.fillText(t, 28, Math.round(fs*0.86)); g.restore(); }
     // stamp
     if(o.stamp && stage >= 1){ const t = String(o.stamp).toUpperCase(); g.font = '900 96px '+FONT; const tw = g.measureText(t).width;
-      g.save(); g.translate(W*0.24, H*0.27); g.rotate(-0.13); g.lineWidth = 12; g.strokeStyle = '#e02424'; rrect(g, -tw/2-36, -66, tw+72, 132, 18); g.stroke();
+      const sx = (o.tag && ovSide(i) === 'L') ? W*0.74 : W*0.24; g.save(); g.translate(sx, H*0.36); g.rotate(sx > W/2 ? 0.1 : -0.12); g.lineWidth = 12; g.strokeStyle = '#e02424'; rrect(g, -tw/2-36, -66, tw+72, 132, 18); g.stroke();
       g.fillStyle = '#e02424'; g.textAlign = 'center'; g.fillText(t, 0, 4); g.restore(); }
     g.restore();
   }
