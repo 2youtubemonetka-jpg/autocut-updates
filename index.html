@@ -481,11 +481,14 @@
           <div class="row"><span>Показывать</span>
             <select id="sbMode"><option value="line">Строку целиком</option><option value="c2">По 2 слова</option><option value="c3">По 3 слова</option><option value="c4">По 4 слова</option></select></div>
           <div class="row"><span>Цвет слова</span>
-            <select id="sbCol"><option value="red">Красная плашка</option><option value="yellow">Жёлтая плашка</option><option value="green">Зелёная плашка</option><option value="blue">Синяя плашка</option><option value="plain">Жёлтый текст без плашки</option></select></div>
+            <select id="sbCol"><option value="red">Красная плашка</option><option value="yellow">Жёлтая плашка</option><option value="green">Зелёная плашка</option><option value="blue">Синяя плашка</option><option value="plain">Жёлтый текст без плашки</option><option value="off">Без подсветки (только ключевые слова)</option></select></div>
           <label class="chk"><input type="checkbox" id="sbCaps"> ЗАГЛАВНЫМИ БУКВАМИ</label>
           <div class="hint" id="sbInfo" style="margin:4px 0 0">Подсветка идёт по реальному времени слов, если проект размечен кнопкой «Разметить по речи». Иначе время слов оценивается по длине.</div>
         </div>
         <label class="chk"><input type="checkbox" id="sbSrt"> Сохранить файл .srt для YouTube</label>
+        <div class="row" style="margin-top:8px"><button class="btn" id="ovPick" style="flex:1" title="Главы, счётчик правил, плашки с фактами, штампы и ключевые слова поверх картинок">Надписи на экране (overlays.json)…</button><button class="btn" id="ovDel" style="display:none" title="Убрать надписи">✕</button></div>
+        <input type="file" id="fOv" accept=".json,application/json" style="display:none">
+        <div class="hint" id="ovInfo" style="margin:0">Файл с надписями не загружен. Его даёт Claude вместе со сценарием.</div>
       </div>
     </div>
 
@@ -1457,7 +1460,7 @@
   const QD = () => ({res:'1080', q:'normal', hw:'auto'});
   const MUD = () => ({path:'', name:'', vol:20, duck:'1', fade:'4'});
   const GND = () => ({text:'', dir:'', key:'', manual:{}});
-  const newState = () => ({lang:'', fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), film:FLD(), au:AUD(), ct:CTD(), gen:GND(), meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
+  const newState = () => ({lang:'', fx:FXD(), tr:TRD(), ql:QD(), sb:SBD(), mu:MUD(), film:FLD(), au:AUD(), ct:CTD(), gen:GND(), ov:[], ovName:'', meta:[], thumb:null, desc:'', preset:'', imgs:[], lines:[], txtName:'', audioName:'', audioUrl:'', audioPath:'', starts:[], idx:0, mode:'idle', dur:0, label:'Добавьте файлы слева'});
   let S = newState();
   const states = {};                       // tabId -> state (files live only in memory)
   const au = new Audio(); au.preload = 'auto';
@@ -1543,6 +1546,7 @@
     const q = S.ql || (S.ql = QD()); $('qRes').value = q.res; $('qQual').value = q.q; $('qHw').value = q.hw || 'auto';
     $('trIn').checked = !!t.fin; $('trOut').checked = !!t.fout;
     $('sbBurn').checked = !!b.burn; $('sbopts').classList.toggle('off', !b.burn); $('sbHl').checked = !!b.hl; $('sbSize').value = b.size; $('sbSrt').checked = !!b.srt; $('sbMode').value = b.mode || 'line'; $('sbCol').value = b.col || 'red'; $('sbCaps').checked = !!b.caps; $('sbMode').disabled = !b.hl; if(typeof sbInfoUpd==='function') sbInfoUpd();
+    if(typeof ovInfoUpd==='function') ovInfoUpd();
     $('muName').textContent = m.name || 'Трек не выбран'; $('muDel').style.display = m.path ? '' : 'none';
     const fl = S.film || (S.film = FLD()); $('fiOn').checked = !!fl.on; ctSync(); $('fiopts').classList.toggle('off', !fl.on); $('fiGrain').value = fl.grain; $('fiVig').value = fl.vig; $('fiShake').value = fl.shake; $('fiTone').value = fl.tone; $('fiFlash').checked = !!fl.flash; $('stage').classList.toggle('film-vig', !!fl.on && +fl.vig > 0); $('auNorm').checked = !!(S.au && S.au.norm); if(typeof renderLang==='function') renderLang(); if(typeof hwInfoUpd==='function') hwInfoUpd();
     $('muopts').classList.toggle('off', !m.path); $('muVol').value = m.vol; $('muDuck').value = m.duck; $('muFade').value = m.fade;
@@ -1622,7 +1626,61 @@
   function trFor(i){ const t = S.tr; if(!t.on || i<1) return 0; const e = Math.max(1, parseInt(t.every,10)||1); return i % e === 0 ? (parseFloat(t.dur)||0.4) : 0; }
 
   // caption pictures: one strip per highlighted word
-  const HLC = {red:['rgba(230,57,70,.62)', '#ffffff', '#f2d680'], yellow:['rgba(250,204,21,.9)', '#111111', '#ffe9a0'], green:['rgba(34,197,94,.75)', '#ffffff', '#c5f5d3'], blue:['rgba(59,130,246,.75)', '#ffffff', '#cfe0ff'], plain:['rgba(0,0,0,0)', '#ffd84d', '#ffffff']};
+  const HLC = {red:['rgba(230,57,70,.62)', '#ffffff', '#f2d680'], yellow:['rgba(250,204,21,.9)', '#111111', '#ffe9a0'], green:['rgba(34,197,94,.75)', '#ffffff', '#c5f5d3'], blue:['rgba(59,130,246,.75)', '#ffffff', '#cfe0ff'], plain:['rgba(0,0,0,0)', '#ffd84d', '#ffffff'], off:['rgba(0,0,0,0)', '#ffffff', '#ffffff']};
+  /* ---- on-screen overlays (chapter badge, rule counter, fact plates, stamps, key words) from overlays.json ---- */
+  function ovOn(){ return Array.isArray(S.ov) && S.ov.some(Boolean); }
+  function ovInfoUpd(){
+    const el = $('ovInfo'), del = $('ovDel'); if(!el) return; const on = ovOn(); if(del) del.style.display = on ? '' : 'none';
+    if(!on){ el.textContent = 'Файл с надписями не загружен. Его даёт Claude вместе со сценарием.'; return; }
+    const n = S.ov.length, r = ovRules();
+    el.textContent = (S.ovName ? S.ovName+': ' : '')+n+' строк, правил: '+r+'.'+(S.lines.length && S.lines.length !== n ? ' Внимание: в тексте '+S.lines.length+' строк, надписи могут сдвинуться.' : ' Надписи вшиваются вместе с субтитрами.');
+  }
+  function ovRuleWord(i){ const t = (S.lines[i]||'') + ' ' + S.lines.slice(0, 40).join(' '); return /\bregel\b/i.test(t) ? 'REGEL ' : /\bregla\b/i.test(t) ? 'REGLA ' : /\bregra\b/i.test(t) ? 'REGRA ' : /правил/i.test(t) ? 'ПРАВИЛО ' : /\brègle\b/i.test(t) ? 'RÈGLE ' : 'RULE '; }
+  function ovRules(){ let m = 0; (S.ov||[]).forEach(o => { if(o && o.rule > m) m = o.rule; }); return m; }
+  function ovRuleAt(i){ let m = 0; for(let k = 0; k <= i && k < S.ov.length; k++){ const o = S.ov[k]; if(o && o.rule > m) m = o.rule; } return m; }
+  const ovNorm = w => String(w).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  function ovHlSet(i){ const o = S.ov[i]; if(!o || !o.highlight) return null; const st = new Set(String(o.highlight).split(/[\s,]+/).map(ovNorm).filter(Boolean)); return st.size ? st : null; }
+  function rrect(g, x, y, w, h, r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+  // draws everything except the captions; stage 0 = start of the line, 1 = after the first words (stamp appears)
+  function drawOverlay(g, i, W, H, stage){
+    const o = S.ov[i] || {}, FONT = '"Segoe UI", Arial, sans-serif';
+    g.save(); g.textBaseline = 'middle';
+    // chapter badge
+    const ch = String(o.chapter || '').replace(/\s+-\s+/, ' \u2022 ').toUpperCase();
+    if(ch){ g.font = '800 30px '+FONT; const tw = g.measureText(ch).width; rrect(g, 28, 26, tw+56, 58, 12); g.fillStyle = 'rgba(12,12,14,.88)'; g.fill(); g.lineWidth = 2; g.strokeStyle = 'rgba(255,255,255,.12)'; g.stroke(); g.fillStyle = '#f5c518'; g.fillText(ch, 56, 56); }
+    // rule counter
+    const R = ovRules(), cur = ovRuleAt(i);
+    if(R > 0 && cur > 0){
+      const d = R > 24 ? 32 : 40, gap = 8, x0 = W - 30 - R*(d+gap) + gap, y = 56;
+      g.font = '800 '+Math.round(d*0.42)+'px '+FONT; g.textAlign = 'center';
+      for(let k = 1; k <= R; k++){
+        const cx = x0 + (k-1)*(d+gap) + d/2, done = k <= cur, now = k === cur && o.rule === k, rad = now ? d*0.62 : d/2;
+        g.beginPath(); g.arc(cx, y, rad, 0, Math.PI*2); g.fillStyle = done ? '#d62828' : 'rgba(12,12,14,.85)'; g.fill();
+        g.lineWidth = now ? 4 : 2; g.strokeStyle = now ? '#ffffff' : (done ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.55)'); g.stroke();
+        g.fillStyle = '#ffffff'; g.fillText(String(k), cx, y+1);
+      }
+      g.textAlign = 'left';
+      if(o.rule){ const t = (o.rule_label || ovRuleWord(i)) + o.rule; g.font = '900 54px '+FONT; const tw = g.measureText(t).width, x = (W - tw)/2 - 30;
+        rrect(g, x, 118, tw+60, 82, 14); g.fillStyle = '#d62828'; g.fill(); g.fillStyle = '#ffffff'; g.fillText(t, x+30, 160); }
+    }
+    // fact plate
+    if(o.tag){ const t = String(o.tag).toUpperCase(); g.font = '800 46px '+FONT; const tw = g.measureText(t).width, x = Math.min(W - tw - 120, W*0.56), y = o.rule ? 250 : 190;
+      g.save(); g.translate(x, y); g.rotate(-0.025); rrect(g, 0, 0, tw+56, 76, 10); g.fillStyle = /^(CA\.|\d)/.test(t) ? '#1f9d55' : 'rgba(20,22,28,.92)'; g.fill(); g.fillStyle = '#ffffff'; g.fillText(t, 28, 40); g.restore(); }
+    // stamp
+    if(o.stamp && stage >= 1){ const t = String(o.stamp).toUpperCase(); g.font = '900 96px '+FONT; const tw = g.measureText(t).width;
+      g.save(); g.translate(W*0.24, H*0.27); g.rotate(-0.13); g.lineWidth = 12; g.strokeStyle = '#e02424'; rrect(g, -tw/2-36, -66, tw+72, 132, 18); g.stroke();
+      g.fillStyle = '#e02424'; g.textAlign = 'center'; g.fillText(t, 0, 4); g.restore(); }
+    g.restore();
+  }
+  $('ovPick').onclick = () => $('fOv').click();
+  $('fOv').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+    try{ const d = JSON.parse(await f.text()), arr = Array.isArray(d) ? d : (d.lines || []); if(!arr.length) throw new Error('пустой файл');
+      const ov = []; arr.forEach((o,k) => { const n = (o && o.line) ? o.line - 1 : k; ov[n] = o || {}; });
+      for(let k = 0; k < ov.length; k++) if(!ov[k]) ov[k] = {};
+      S.ov = ov; S.ovName = f.name; Object.assign(S.sb, {burn:true, hl:true, mode:'c4', col:'off', caps:true, size:'70'}); renderPost(); touch();
+      toast('Надписи загружены: '+ov.length+' строк, правил: '+ovRules()+'. Субтитры включены: крупные, заглавными, по 4 слова, как в видео-объяснялках.');
+    }catch(err){ toast('Не получилось прочитать надписи: '+err.message); } };
+  $('ovDel').onclick = () => { S.ov = []; S.ovName = ''; renderPost(); touch(); };
   function sbChunk(){ const m = /^c(\d)$/.exec(S.sb.mode || ''); return m ? +m[1] : 0; }
   // time of every word of line i (seconds from the start of the picture), from the speech recognition when it is available
   function wordTimes(i, dur){
@@ -1637,7 +1695,7 @@
     const text = S.lines[i] || ''; const ws = wordsOf(text); if(!ws.length) return null;
     const chunkN = S.sb.hl ? sbChunk() : 0, caps = !!S.sb.caps, col = HLC[S.sb.col] || HLC.red;
     const base = vert ? Math.round((parseInt(S.sb.size,10) || 56)*0.9) : (parseInt(S.sb.size,10) || 56);
-    const size = chunkN ? Math.round(base*1.3) : base, Wd = vert ? 1080 : 1920, Hs = Math.round(size*3.6 + 80);
+    const size = chunkN ? Math.round(base*1.3) : base, Wd = vert ? 1080 : 1920, OV = !vert && ovOn(), Hs = OV ? 1080 : Math.round(size*3.6 + 80), hlSet = OV ? ovHlSet(i) : null, stampAt = Math.min(ws.length-1, Math.max(1, Math.floor(ws.length*0.35)));
     const c = document.createElement('canvas'); c.width = Wd; c.height = Hs; const g = c.getContext('2d');
     g.font = '700 '+size+'px "Segoe UI", Arial, sans-serif'; g.textBaseline = 'alphabetic';
     const label = k => caps ? ws[k].toUpperCase() : ws[k];
@@ -1655,8 +1713,11 @@
       lines.forEach((ln,r) => { const tw = ln.reduce((a,x)=>a+x.m,0) + sp*(ln.length-1); let x = (Wd-tw)/2; ln.forEach(o => { pos[o.k] = {x, y:y0+r*lh, m:o.m}; x += o.m + sp; }); });
       lay.push(pos); gr.forEach(k => gOf[k] = gi);
     });
+    const memo = new Map(), plainCol = S.sb.col === 'off';
     const draw = hl => {
-      g.clearRect(0,0,Wd,Hs); g.lineJoin = 'round';
+      const stg = OV ? ((hl < 0 ? 0 : hl) >= stampAt || !S.sb.hl ? 1 : 0) : 0, gi0 = hl < 0 ? 0 : hl >= ws.length ? groups.length-1 : gOf[hl], mk = gi0+'|'+stg+'|'+(plainCol ? '' : hl);
+      if(memo.has(mk)) return memo.get(mk);
+      g.clearRect(0,0,Wd,Hs); if(OV){ drawOverlay(g, i, Wd, Hs, (hl < 0 ? 0 : hl) >= stampAt || !S.sb.hl ? 1 : 0); g.font = '700 '+size+'px "Segoe UI", Arial, sans-serif'; g.textBaseline = 'alphabetic'; g.textAlign = 'left'; } g.lineJoin = 'round';
       const gi = hl < 0 ? 0 : hl >= ws.length ? groups.length-1 : gOf[hl], pos = lay[gi];
       groups[gi].forEach(k => {
         const p = pos[k], now = hl === k, doneW = hl > k;
@@ -1664,10 +1725,11 @@
           g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.fill(); }
         const plate = now && col[0] !== 'rgba(0,0,0,0)';
         if(!plate){ g.lineWidth = size*0.16; g.strokeStyle = 'rgba(0,0,0,.92)'; g.strokeText(label(k), p.x, p.y); }
-        g.fillStyle = now ? col[1] : (doneW && !chunkN ? col[2] : '#ffffff'); g.fillText(label(k), p.x, p.y);
+        const key = hlSet && hlSet.has(ovNorm(ws[k])); g.fillStyle = now && !(key && !plate) ? col[1] : (key ? '#ffd60a' : (doneW && !chunkN ? col[2] : '#ffffff')); g.fillText(label(k), p.x, p.y);
       });
-      return c.toDataURL('image/png').split(',')[1];
+      const out = c.toDataURL('image/png').split(',')[1]; memo.set(mk, out); return out;
     };
+    const merge = r => { const a = []; r.subs.forEach(x => { const l = a[a.length-1]; if(l && l.png === x.png) l.d += x.d; else a.push({png:x.png, d:x.d}); }); r.subs = a; return r; };
     if(!S.sb.hl) return {strip:Hs, subs:[{png:draw(-1), d:dur}]};
     const wt = wordTimes(i, dur);
     if(wt){      // real timing: the picture before the first word, one per word, and the finished line at the end
@@ -1680,10 +1742,10 @@
       });
       const used = subs.reduce((a,x)=>a+x.d,0);
       if(dur - used > 0.06) subs.push({png:draw(ws.length), d:dur - used});
-      return {strip:Hs, subs};
+      return merge({strip:Hs, subs});
     }
     const wts = W[i] && W[i].length === ws.length ? W[i] : ws.map(wWeight), sum = wts.reduce((a,b)=>a+b,0);
-    return {strip:Hs, subs: ws.map((_,k) => ({png:draw(k), d:dur*wts[k]/sum}))};
+    return merge({strip:Hs, subs: ws.map((_,k) => ({png:draw(k), d:dur*wts[k]/sum}))});
   }
   function blankStrip(h, w){ const c = document.createElement('canvas'); c.width = w || 1920; c.height = h; return c.toDataURL('image/png').split(',')[1]; }
   function buildFrames(range, xo){
@@ -2246,7 +2308,7 @@
   function serialize(st){
     return {lang:st.lang||'', imgs:st.imgs.map(i => i.n != null ? ({name:i.name, path:i.path||'', n:i.n}) : ({name:i.name, path:i.path||''})), lines:st.lines, txtName:st.txtName,
             audioName:st.audioName, audioPath:st.audioPath, dur:st.dur, starts:st.starts, idx:st.idx, mode:st.mode,
-            pos:st.pos||0, rendered:!!st.rendered, lastOut:st.lastOut||'', pack:st.pack||null, fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, film:st.film, au:st.au, ct:st.ct, tight:st.tight||null, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}, meta:st.meta||[], thumb:st.thumb||null, desc:st.desc||'', preset:st.preset||''};
+            pos:st.pos||0, rendered:!!st.rendered, lastOut:st.lastOut||'', pack:st.pack||null, ov:st.ov||[], ovName:st.ovName||'', fx:st.fx, tr:st.tr, ql:st.ql, sb:st.sb, mu:st.mu, film:st.film, au:st.au, ct:st.ct, tight:st.tight||null, gen:{text:st.gen.text, dir:st.gen.dir, key:st.gen.key, manual:st.gen.manual||{}}, meta:st.meta||[], thumb:st.thumb||null, desc:st.desc||'', preset:st.preset||''};
   }
   function saveProject(id){
     const st = states[id], f = findTab(id); if(!st || !f) return;
@@ -2269,7 +2331,7 @@
     let d = null; try{ d = JSON.parse(localStorage.getItem(pKey(id))||'null'); }catch(e){}
     if(!d){ const f = findTab(id), pr = f && presetById(f.c.preset); if(pr) applyPresetTo(st, pr); return st; }
     st.lang = d.lang || ''; st.meta = Array.isArray(d.meta) ? d.meta : []; st.thumb = d.thumb || null; st.desc = d.desc || ''; st.preset = d.preset || '';
-    st.lines = d.lines || []; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.lastOut = d.lastOut || ''; st.pack = d.pack || null; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = filmFix(d.film); st.au = Object.assign(AUD(), d.au || {}); st.ct = Object.assign(CTD(), d.ct || {}); st.tight = d.tight || null; st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
+    st.lines = d.lines || []; st.ov = Array.isArray(d.ov) ? d.ov : []; st.ovName = d.ovName || ''; st.txtName = d.txtName || ''; st.rendered = !!d.rendered; st.lastOut = d.lastOut || ''; st.pack = d.pack || null; st.fx = Object.assign(FXD(), d.fx || {}); st.tr = Object.assign(TRD(), d.tr || {}); st.ql = Object.assign(QD(), d.ql || {}); st.sb = Object.assign(SBD(), d.sb || {}); st.mu = Object.assign(MUD(), d.mu || {}); st.film = filmFix(d.film); st.au = Object.assign(AUD(), d.au || {}); st.ct = Object.assign(CTD(), d.ct || {}); st.tight = d.tight || null; st.gen = Object.assign(GND(), d.gen || {}); if(!st.gen.manual) st.gen.manual = {};
     if(NATIVE){
       st.imgs = (d.imgs||[]).filter(i => i.path).map(i => i.n != null ? ({name:i.name, path:i.path, url:fileUrl(i.path), n:i.n}) : ({name:i.name, path:i.path, url:fileUrl(i.path)}));
       if(d.audioPath){ st.audioPath = d.audioPath; st.audioName = d.audioName; st.audioUrl = fileUrl(d.audioPath); }
